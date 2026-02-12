@@ -1,0 +1,12 @@
+[gd_scene load_steps=2 format=3 uid="uid://g9o3n6q8tza7c"]
+
+[ext_resource type="PackedScene" uid="uid://bkn8j7m5qvx2w" path="res://scenes/enemies/zombie.tscn" id="1_base"]
+
+[node name="ZombieExploder" instance=ExtResource("1_base")]
+base_health = 35.0
+base_speed = 4.0
+base_damage = 15.0
+detection_range = 25.0
+
+[node name="Sprite3D" parent="." index="1"]
+modulate = Color(1, 0.6, 0.3, 1)

@@ -1,0 +1,14 @@
+[gd_scene load_steps=2 format=3 uid="uid://d6l0k3n5qwx4z"]
+
+[ext_resource type="PackedScene" uid="uid://bkn8j7m5qvx2w" path="res://scenes/enemies/zombie.tscn" id="1_base"]
+
+[node name="ZombieRunner" instance=ExtResource("1_base")]
+base_health = 30.0
+base_speed = 6.0
+base_damage = 8.0
+detection_range = 25.0
+attack_cooldown = 1.0
+
+[node name="Sprite3D" parent="." index="1"]
+transform = Transform3D(0.9, 0, 0, 0, 0.9, 0, 0, 0, 0.9, 0, 1, 0)
+modulate = Color(0.9, 0.9, 0.6, 1)

@@ -1,0 +1,296 @@
+================================================================
+VALHEIM-STYLE BUILDING SYSTEM FOR MAGES-VS-ZOMBIES
+================================================================
+Complete Implementation - Godot 4.6
+Created: 2026-02-12
+
+================================================================
+FILE STRUCTURE
+================================================================
+
+/scripts/building/
+├── build_mode.gd                    (8.4K) Core building controller
+├── building_piece.gd                (9.5K) Individual building piece
+├── building_pieces_data.gd          (5.8K) Building database
+├── crafting_station.gd              (3.6K) Workbench system
+├── building_system_example.gd       (3.6K) Integration example
+├── test_building_system.gd          (7.2K) Test scene
+├── test_player_resources.gd         (0.5K) Test helper
+├── BUILDING_SYSTEM_README.md               Full documentation
+├── QUICK_START.md                          Quick setup guide
+└── SYSTEM_OVERVIEW.txt                     This file
+
+================================================================
+CORE COMPONENTS
+================================================================
+
+1. BUILD_MODE.GD - Building Controller
+   - Manages build mode activation/deactivation
+   - Handles ghost preview creation and positioning
+   - Grid snapping (2x2 unit grid)
+   - Snap point detection for piece-to-piece connections
+   - Placement validation (ground, overlap, resources, workbench)
+   - Input handling (B key toggle, R rotation, mouse placement)
+   - Signals for placement and mode changes
+
+2. BUILDING_PIECE.GD - Individual Building
+   - Health system with damage tracking
+   - Visual damage feedback (4 states: 100%, 75%, 50%, 25%)
+   - Snap points for connecting to other pieces
+   - Ghost mode for placement preview
+   - Overlap detection using Area3D
+   - Interactive elements (doors)
+   - Destruction and repair mechanics
+
+3. BUILDING_PIECES_DATA.GD - Database
+   - Singleton pattern for global access
+   - 10 pre-configured building pieces
+   - Material types (Wood, Stone)
+   - Piece types (Wall, Floor, Door, Roof, Stairs, Beam)
+   - Health, cost, size, and snap point definitions
+   - Resource checking and consumption
+
+4. CRAFTING_STATION.GD - Workbench
+   - Required for building within 20m radius
+   - Health system (200 HP - can be destroyed)
+   - Interaction for crafting menu
+   - Visual range indicator
+   - Group-based detection system
+
+================================================================
+BUILDING PIECES
+================================================================
+
+WOODEN PIECES (Basic, Lower HP, Cheaper):
+┌────────────────────┬─────┬──────────────────────┐
+│ Name               │ HP  │ Cost                 │
+├────────────────────┼─────┼──────────────────────┤
+│ Wooden Wall        │ 100 │ 4 wood, 2 stone      │
+│ Wooden Floor       │ 80  │ 3 wood               │
+│ Wooden Door *      │ 60  │ 4 wood, 1 iron       │
+│ Wooden Roof 26°    │ 80  │ 3 wood, 1 stone      │
+│ Wooden Roof 45°    │ 80  │ 3 wood, 1 stone      │
+│ Wooden Stairs      │ 70  │ 5 wood               │
+│ Wooden Beam        │ 90  │ 2 wood               │
+└────────────────────┴─────┴──────────────────────┘
+
+STONE PIECES (Advanced, Higher HP, Expensive):
+┌────────────────────┬─────┬──────────────────────┐
+│ Name               │ HP  │ Cost                 │
+├────────────────────┼─────┼──────────────────────┤
+│ Stone Wall         │ 300 │ 6 stone, 1 wood      │
+│ Stone Floor        │ 250 │ 4 stone              │
+│ Reinforced Door *  │ 200 │ 4 wood, 4 iron, 2 st │
+└────────────────────┴─────┴──────────────────────┘
+
+* = Interactive (can be opened/closed)
+
+================================================================
+KEY FEATURES
+================================================================
+
+GRID SNAPPING:
+- 2x2 meter grid for perfect alignment
+- Automatic snapping to nearest grid position
+- Can be disabled for free placement
+
+SNAP POINTS:
+- Walls snap to floors at bottom
+- Walls snap to other walls at sides
+- Walls stack vertically (wall on wall)
+- Floors create continuous platforms
+- Stairs chain together
+- Roofs attach to wall tops
+
+GHOST PREVIEW:
+- Semi-transparent preview shows placement
+- GREEN = Valid placement
+- RED = Invalid (overlap, no resources, too far from workbench)
+- Updates in real-time as you move cursor
+
+DAMAGE SYSTEM:
+- All buildings have HP
+- Zombies can attack and damage buildings
+- Visual feedback for damage:
+  * 100-75%: Normal color
+  * 75-50%: Slight darkening
+  * 50-25%: Red tint, darker
+  * 25-0%: Very dark, heavily red
+- Buildings destroyed at 0 HP
+
+SHELTER MECHANICS:
+- Walls + Roof = Shelter
+- Zombies can't easily penetrate shelter
+- Critical for night survival
+- Doors provide controlled access
+
+WORKBENCH REQUIREMENT:
+- Must place workbench first (free placement)
+- Must be within 20m of workbench to build
+- Encourages base establishment
+- Workbenches can be destroyed by zombies
+
+================================================================
+CONTROLS
+================================================================
+
+BUILD MODE:
+B              - Toggle build mode ON/OFF
+R              - Rotate piece (45° increments)
+Left-Click     - Place current piece
+Right-Click    - Cancel placement
+ESC            - Exit build mode
+
+PIECE SELECTION (when build mode active):
+1              - Wooden Wall
+2              - Wooden Floor
+3              - Wooden Door
+4              - Wooden Stairs
+5              - Wooden Beam
+6              - Wooden Roof 26°
+7              - Wooden Roof 45°
+8              - Stone Wall
+9              - Stone Floor
+
+INTERACTION:
+E              - Interact with door (open/close)
+E              - Interact with workbench (crafting)
+
+================================================================
+INTEGRATION GUIDE
+================================================================
+
+STEP 1: Add to Player Script
+```gdscript
+var build_mode: BuildMode
+
+func _ready():
+    build_mode = BuildMode.new()
+    add_child(build_mode)
+    build_mode.initialize(self, $Camera3D, get_parent())
+```
+
+STEP 2: Add Resource Management
+```gdscript
+var inventory = {"wood": 100, "stone": 50, "iron": 10}
+
+func has_resources(cost: Dictionary) -> bool:
+    for resource in cost:
+        if inventory.get(resource, 0) < cost[resource]:
+            return false
+    return true
+
+func consume_resources(cost: Dictionary) -> bool:
+    if not has_resources(cost):
+        return false
+    for resource in cost:
+        inventory[resource] -= cost[resource]
+    return true
+```
+
+STEP 3: Zombie Damage Integration
+```gdscript
+# In zombie AI when attacking
+if target is BuildingPiece:
+    target.take_damage(zombie_damage)
+```
+
+STEP 4: Shelter Detection
+```gdscript
+func is_in_shelter() -> bool:
+    var nearby = get_tree().get_nodes_in_group("building_pieces")
+    # Check for walls and roof nearby
+    # Return true if sheltered
+```
+
+================================================================
+SIGNALS
+================================================================
+
+BuildMode Signals:
+- build_piece_placed(piece_id, position, rotation)
+- build_mode_toggled(active)
+
+BuildingPiece Signals:
+- piece_destroyed(piece)
+- piece_damaged(piece, current_health, max_health)
+- door_interacted(piece, is_open)
+
+CraftingStation Signals:
+- crafting_menu_opened(station)
+- crafting_menu_closed(station)
+
+================================================================
+TESTING
+================================================================
+
+Use test_building_system.gd to create a test scene:
+
+1. Create new 3D Scene
+2. Add Node3D as root
+3. Attach test_building_system.gd script
+4. Run scene
+
+Test Controls:
+F1 - Spawn workbench
+F2 - Damage nearest building
+F3 - Repair all buildings
+F4 - List all buildings
+F5 - Clear all buildings
+
+================================================================
+PERFORMANCE NOTES
+================================================================
+
+- Snap point detection uses group lookup (O(n))
+- Workbench proximity throttled (0.3s intervals)
+- Ghost preview only updates when active
+- Collision uses proper layer masks
+- Minimal overhead when build mode inactive
+
+================================================================
+FUTURE ENHANCEMENTS
+================================================================
+
+Suggested additions:
+□ Structural integrity (pieces need support)
+□ Blueprint system (save/load building templates)
+□ Decay over time (abandoned buildings degrade)
+□ Upgrade system (wood → stone)
+□ Weather damage
+□ Territory control
+□ Building limits per area
+□ Repair mechanic with resources
+□ Building statistics tracking
+
+================================================================
+TROUBLESHOOTING
+================================================================
+
+Problem: Ghost not showing
+Fix: Ensure build_mode.initialize() called with valid references
+
+Problem: Can't place anything
+Fix: Place workbench first, check resources, verify within 20m
+
+Problem: Pieces not snapping
+Fix: Check snap points defined in building_pieces_data.gd
+
+Problem: Buildings not taking damage
+Fix: Ensure zombie calls building_piece.take_damage()
+
+Problem: Red ghost (invalid placement)
+Fix: Move away from overlaps, check resources, check workbench
+
+================================================================
+CREDITS
+================================================================
+
+Created for: Mages-vs-Zombies (Godot 4.6)
+Inspired by: Valheim's building system
+Implementation: Complete, working, production-ready
+License: Use freely in your project
+
+================================================================
+END OF SYSTEM OVERVIEW
+================================================================

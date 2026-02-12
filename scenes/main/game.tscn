@@ -1,0 +1,60 @@
+[gd_scene load_steps=6 format=3 uid="uid://c1m2v3r4t5y6u"]
+
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="1_player"]
+[ext_resource type="Script" path="res://scripts/terrain/terrain_world.gd" id="2_terrain"]
+[ext_resource type="Script" path="res://scripts/enemies/zombie_horde.gd" id="3_zombie_horde"]
+[ext_resource type="Script" path="res://scripts/main/game_controller.gd" id="4_game_controller"]
+[ext_resource type="PackedScene" path="res://scenes/ui/pause_menu.tscn" id="5_pause_menu"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_main"]
+sky_top_color = Color(0.2, 0.3, 0.6, 1)
+sky_horizon_color = Color(0.5, 0.5, 0.6, 1)
+ground_bottom_color = Color(0.1, 0.1, 0.15, 1)
+ground_horizon_color = Color(0.3, 0.3, 0.35, 1)
+
+[sub_resource type="Sky" id="Sky_main"]
+sky_material = SubResource("ProceduralSkyMaterial_main")
+
+[sub_resource type="Environment" id="Environment_main"]
+background_mode = 2
+sky = SubResource("Sky_main")
+ambient_light_source = 2
+ambient_light_color = Color(0.3, 0.35, 0.4, 1)
+ambient_light_energy = 0.4
+tonemap_mode = 2
+ssao_enabled = true
+glow_enabled = true
+glow_intensity = 0.5
+fog_enabled = true
+fog_light_color = Color(0.4, 0.45, 0.5, 1)
+fog_density = 0.002
+
+[node name="Game" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_main")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, -0.75, 0.433013, 0, 50, 0)
+light_color = Color(1, 0.95, 0.85, 1)
+light_energy = 1.2
+shadow_enabled = true
+shadow_blur = 1.5
+
+[node name="TerrainWorld" type="Node3D" parent="."]
+script = ExtResource("2_terrain")
+view_distance = 6
+world_seed = 12345
+
+[node name="ZombieHorde" type="Node3D" parent="."]
+script = ExtResource("3_zombie_horde")
+
+[node name="Player" parent="." instance=ExtResource("1_player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 100, 0)
+
+[node name="GameController" type="Node" parent="."]
+script = ExtResource("4_game_controller")
+
+[node name="PauseMenu" parent="." instance=ExtResource("5_pause_menu")]
+
+[editable path="Player"]

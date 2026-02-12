@@ -1,0 +1,21 @@
+[gd_scene load_steps=3 format=3 uid="uid://e7m1l4o6rxy5a"]
+
+[ext_resource type="PackedScene" uid="uid://bkn8j7m5qvx2w" path="res://scenes/enemies/zombie.tscn" id="1_base"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_brute"]
+radius = 0.48
+height = 2.16
+
+[node name="ZombieBrute" instance=ExtResource("1_base")]
+base_health = 150.0
+base_speed = 1.5
+base_damage = 25.0
+attack_range = 2.5
+attack_cooldown = 2.5
+
+[node name="CollisionShape3D" parent="." index="0"]
+shape = SubResource("CapsuleShape3D_brute")
+
+[node name="Sprite3D" parent="." index="1"]
+transform = Transform3D(1.3, 0, 0, 0, 1.3, 0, 0, 0, 1.3, 0, 1, 0)
+modulate = Color(0.8, 0.5, 0.5, 1)

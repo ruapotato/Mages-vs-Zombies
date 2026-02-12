@@ -1,0 +1,332 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    MAGES-VS-ZOMBIES SPELL SYSTEM ARCHITECTURE
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           AUTOLOAD / GLOBAL SYSTEMS                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    ┌───────────────────────────────────────────────────────────┐
+    │                    SpellRegistry                          │
+    │  (Singleton - Autoload)                                   │
+    ├───────────────────────────────────────────────────────────┤
+    │  • 20 spell definitions                                   │
+    │  • Damage type enum (FIRE, ICE, LIGHTNING, etc.)          │
+    │  • Spell type enum (PROJECTILE, BEAM, AOE)                │
+    │  • Helper functions (get_spell_data, etc.)                │
+    │  • Color mapping for elements                             │
+    └───────────────────────────────────────────────────────────┘
+                              │
+                              │ Provides Data
+                              ▼
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              PLAYER SYSTEMS                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    ┌────────────────────────────────┐        ┌─────────────────────────────┐
+    │       ManaManager              │        │      SpellManager           │
+    │  (Node - Player Child)         │◄───────┤  (Node - Player Child)      │
+    ├────────────────────────────────┤ checks │├─────────────────────────────┤
+    │  • Max mana (100)              │  mana  ││  • 5 spell slots            │
+    │  • Current mana                │        ││  • Active slot tracking     │
+    │  • Regen rate (5/sec)          │        ││  • Spell instance creation  │
+    │  • Regen delay after cast      │        ││  • Cooldown queries         │
+    │  • consume_mana()              │        ││  • Cast coordination        │
+    │  • add_mana()                  │        ││  • equip_spell()            │
+    │  • Signals: mana_changed       │        ││  • try_cast_spell()         │
+    └────────────────────────────────┘        │└─────────────────────────────┘
+                                              │            │
+                                              │            │ Creates
+                                              │            ▼
+                                              │
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            SPELL BASE CLASSES                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────────────────────────────────────────────────┐
+    │                         SpellBase                                │
+    │                    (Node3D - Abstract)                           │
+    ├──────────────────────────────────────────────────────────────────┤
+    │  Core Properties:                                                │
+    │    • spell_id, display_name, description                         │
+    │    • damage_type, spell_type, spell_tier                         │
+    │    • base_damage, mana_cost, cast_time, cooldown                 │
+    │                                                                  │
+    │  State:                                                          │
+    │    • is_casting, is_on_cooldown, can_cast                        │
+    │    • owner_player reference                                      │
+    │    • spell_data (SpellData resource)                             │
+    │                                                                  │
+    │  Methods:                                                        │
+    │    • try_cast() - Initiate spell cast                            │
+    │    • _execute_spell() - Abstract, implemented by subclasses      │
+    │    • apply_damage_to_enemy()                                     │
+    │    • _apply_status_effects()                                     │
+    │    • get_cast_direction(), get_cast_origin()                     │
+    │    • raycast_from_camera()                                       │
+    │                                                                  │
+    │  Timers:                                                         │
+    │    • CastTimer - Cast time countdown                             │
+    │    • CooldownTimer - Cooldown tracking                           │
+    │                                                                  │
+    │  Signals:                                                        │
+    │    • spell_cast, casting_started, casting_finished               │
+    │    • cooldown_started, cooldown_finished                         │
+    └──────────────────────────────────────────────────────────────────┘
+                    │                │                │
+                    │                │                │
+        ┌───────────┘                │                └───────────┐
+        │                            │                            │
+        ▼                            ▼                            ▼
+
+┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐
+│  ProjectileSpell    │  │     BeamSpell       │  │      AOESpell       │
+│  (Extends SpellBase)│  │  (Extends SpellBase)│  │  (Extends SpellBase)│
+├─────────────────────┤  ├─────────────────────┤  ├─────────────────────┤
+│  Used For:          │  │  Used For:          │  │  Used For:          │
+│  • Fireball         │  │  • Chain Lightning  │  │  • Meteor Storm     │
+│  • Ice Shard        │  │  • Soul Drain       │  │  • Blizzard         │
+│  • Magic Missile    │  │                     │  │  • Frost Nova       │
+│  • Shadow Bolt      │  │  Features:          │  │  • Flame Wave       │
+│  • Thunder Strike   │  │  • Beam rendering   │  │  • Inferno          │
+│  • Glacial Spike    │  │  • Target tracking  │  │  • Divine Light     │
+│  • Smite            │  │  • Chain mechanics  │  │  • Time Warp        │
+│  • Arcane Blast     │  │  • Lifesteal/mana   │  │  • Healing Rain     │
+│                     │  │  • Continuous dmg   │  │  • Vine Grasp       │
+│  Features:          │  │                     │  │  • Static Field     │
+│  • Spawn projectiles│  │  Components:        │  │                     │
+│  • Multi-missile    │  │  • beam_mesh        │  │  Features:          │
+│  • Spread patterns  │  │  • beam_light       │  │  • Area detection   │
+│  • Homing support   │  │  • damage ticks     │  │  • Persistent areas │
+│                     │  │  • chain visuals    │  │  • Expanding waves  │
+│  Spawns:            │  │                     │  │  • Meteor rain      │
+│  SpellProjectile ───┼──┼─────────────────────┼──┼─ Instant AoE       │
+│        │            │  │                     │  │                     │
+│        ▼            │  │                     │  │  Components:        │
+└─────────────────────┘  └─────────────────────┘  │  • aoe_area (Area3D)│
+                                                   │  • aoe_mesh         │
+┌─────────────────────────────────────────────┐   │  • aoe_particles    │
+│          SpellProjectile                    │   │  • damage ticks     │
+│      (RigidBody3D - Physics)                │   │  • enemy detection  │
+├─────────────────────────────────────────────┤   └─────────────────────┘
+│  Properties:                                │
+│  • damage, speed, lifetime                  │
+│  • direction, homing_strength               │
+│  • pierce_count, explosion_radius           │
+│  • owner_spell, owner_player                │
+│                                             │
+│  Features:                                  │
+│  • Collision detection                      │
+│  • Homing behavior                          │
+│  • Pierce through enemies                   │
+│  • Explosion on impact                      │
+│  • Visual effects (mesh, light, particles)  │
+│                                             │
+│  Methods:                                   │
+│  • _on_body_entered()                       │
+│  • _apply_homing()                          │
+│  • _explode()                               │
+│  • find_homing_target()                     │
+└─────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              DATA CLASSES                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────────────────────────────────────────────────┐
+    │                          SpellData                               │
+    │                   (Resource - Data Container)                    │
+    ├──────────────────────────────────────────────────────────────────┤
+    │  Basic:                                                          │
+    │    • spell_id, display_name, description                         │
+    │    • damage_type, spell_type, spell_tier                         │
+    │                                                                  │
+    │  Core Stats:                                                     │
+    │    • base_damage, mana_cost, cast_time, cooldown                 │
+    │                                                                  │
+    │  Projectile Properties (40+ properties total):                   │
+    │    • projectile_speed, lifetime, homing_strength                 │
+    │    • pierce_count, missile_count                                 │
+    │                                                                  │
+    │  Beam Properties:                                                │
+    │    • beam_range, beam_duration, beam_width                       │
+    │    • chain_count, chain_range, chain_damage_falloff              │
+    │                                                                  │
+    │  AOE Properties:                                                 │
+    │    • aoe_radius, aoe_duration, explosion_radius                  │
+    │    • meteor_count, meteor_interval                               │
+    │                                                                  │
+    │  Status Effects:                                                 │
+    │    • burn_damage_per_sec, burn_duration                          │
+    │    • slow_percent, slow_duration                                 │
+    │    • freeze_chance, freeze_duration                              │
+    │    • stun_chance, stun_duration                                  │
+    │    • root_duration, dot_damage_per_sec                           │
+    │                                                                  │
+    │  Special:                                                        │
+    │    • lifesteal_percent, mana_steal_percent                       │
+    │    • bonus_vs_undead, knockback_force                            │
+    │    • heal_per_tick, mana_regen_bonus                             │
+    │                                                                  │
+    │  Visual/Audio:                                                   │
+    │    • cast_sound, impact_sound, particle_effect                   │
+    │    • trail_color, glow_intensity                                 │
+    │                                                                  │
+    │  Methods:                                                        │
+    │    • static from_dict(data: Dictionary) -> SpellData             │
+    └──────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           ENEMY INTEGRATION                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────────────────────────────────────────────────┐
+    │                       Enemy (User Script)                        │
+    ├──────────────────────────────────────────────────────────────────┤
+    │  Required Methods:                                               │
+    │    • take_damage(amount, attacker, is_crit, hit_pos)             │
+    │                                                                  │
+    │  Optional Status Effect Methods:                                 │
+    │    • apply_burn(dps, duration)                                   │
+    │    • apply_slow(percent, duration)                               │
+    │    • apply_freeze(duration)                                      │
+    │    • apply_stun(duration)                                        │
+    │    • apply_root(duration)                                        │
+    │    • apply_dot(dps, duration)                                    │
+    │    • apply_knockback(force)                                      │
+    │    • is_undead() -> bool                                         │
+    └──────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            SIGNAL FLOW                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    Player Input
+        │
+        ▼
+    SpellManager.try_cast_active_spell()
+        │
+        ├─> Check ManaManager.has_enough_mana()
+        │
+        ├─> SpellBase.try_cast()
+        │       │
+        │       ├─> Check is_casting, is_on_cooldown, can_cast
+        │       │
+        │       ├─> Start CastTimer
+        │       │
+        │       └─> emit casting_started
+        │
+        ▼
+    CastTimer.timeout
+        │
+        ▼
+    SpellBase._finish_cast()
+        │
+        ├─> ManaManager.consume_mana()
+        │       └─> emit mana_changed
+        │
+        ├─> SpellBase._execute_spell()
+        │       │
+        │       ├─> ProjectileSpell: Spawn projectiles
+        │       ├─> BeamSpell: Create beam visual
+        │       └─> AOESpell: Create area effect
+        │
+        ├─> Start CooldownTimer
+        │       └─> emit cooldown_started
+        │
+        └─> emit spell_cast
+                │
+                └─> UI updates, effects, etc.
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          DAMAGE TYPE HIERARCHY                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    FIRE (Red-Orange)
+    ├─ Fireball       [Projectile, Tier 1] - 50 dmg, 15 mana
+    ├─ Flame Wave     [AOE, Tier 2]       - 35 dmg, 25 mana
+    ├─ Inferno        [AOE, Tier 3]       - 80 dmg, 45 mana
+    └─ Meteor Storm   [AOE, Tier 4]       - 120 dmg, 60 mana
+
+    ICE (Cyan-Blue)
+    ├─ Ice Shard      [Projectile, Tier 1] - 45 dmg, 12 mana
+    ├─ Frost Nova     [AOE, Tier 2]       - 40 dmg, 20 mana
+    ├─ Glacial Spike  [Projectile, Tier 3] - 100 dmg, 40 mana
+    └─ Blizzard       [AOE, Tier 4]       - 25 dmg, 50 mana
+
+    LIGHTNING (Electric Blue)
+    ├─ Chain Lightning [Beam, Tier 2]      - 60 dmg, 30 mana
+    ├─ Thunder Strike  [Projectile, Tier 3] - 90 dmg, 35 mana
+    └─ Static Field    [AOE, Tier 3]       - 20 dmg, 40 mana
+
+    ARCANE (Purple-Violet)
+    ├─ Magic Missile  [Projectile, Tier 1] - 30 dmg, 10 mana
+    ├─ Arcane Blast   [Projectile, Tier 3] - 85 dmg, 35 mana
+    └─ Time Warp      [AOE, Tier 4]       - 0 dmg, 55 mana [Support]
+
+    NATURE (Green)
+    ├─ Vine Grasp     [AOE, Tier 2]       - 25 dmg, 20 mana
+    └─ Healing Rain   [AOE, Tier 3]       - -30 dmg, 40 mana [Healing]
+
+    DARK (Deep Purple)
+    ├─ Soul Drain     [Beam, Tier 2]      - 35 dmg, 15 mana [Lifesteal]
+    └─ Shadow Bolt    [Projectile, Tier 2] - 70 dmg, 25 mana
+
+    HOLY (Golden-White)
+    ├─ Divine Light   [AOE, Tier 2]       - 65 dmg, 30 mana [Anti-Undead]
+    └─ Smite          [Projectile, Tier 3] - 110 dmg, 45 mana [Anti-Undead]
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           STATUS EFFECTS                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    Burn (Fire)         → Damage over time
+    Slow (Ice)          → Reduce movement speed
+    Freeze (Ice)        → Complete immobilization
+    Stun (Lightning)    → Interrupt actions, immobilize
+    Root (Nature)       → Prevent movement
+    DOT (Dark)          → Generic damage over time
+    Knockback (Various) → Push enemies
+    Lifesteal (Dark)    → Heal on damage
+    Manasteal (Dark)    → Restore mana on damage
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                              IMPLEMENTATION NOTES
+═══════════════════════════════════════════════════════════════════════════════
+
+Dependencies:
+  • AudioManager (for sound effects)
+  • GameManager (for power-ups like Insta-Kill)
+  • Physics layers (World: 0b1, Enemy: 0b100, Projectile: 0b10000)
+
+Collision Layers:
+  Layer 1 (0b1)     : World/Terrain
+  Layer 2 (0b10)    : Interactable
+  Layer 3 (0b100)   : Enemy
+  Layer 4 (0b1000)  : Player
+  Layer 5 (0b10000) : Projectile
+
+Initialization Order:
+  1. SpellRegistry (Autoload)
+  2. Player scene loads
+  3. ManaManager._ready() initializes mana
+  4. SpellManager._ready() equips default spells
+  5. SpellManager creates spell instances
+  6. Spells load data from SpellRegistry
+  7. System ready for input
+
+Performance:
+  • Shape queries for AOE: ~10ms for 50 enemies
+  • Projectile raycasts: ~1ms per cast
+  • Mana regen: 0.1s tick rate
+  • Recommended max projectiles: 100
+  • Recommended max active spells: 50
+
+═══════════════════════════════════════════════════════════════════════════════
