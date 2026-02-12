@@ -3,6 +3,7 @@
 [ext_resource type="PackedScene" uid="uid://bkn8j7m5qvx2w" path="res://scenes/enemies/zombie.tscn" id="1_base"]
 
 [node name="ZombieMage" instance=ExtResource("1_base")]
+zombie_type = "mage_zombie"
 base_health = 40.0
 base_speed = 2.5
 base_damage = 5.0

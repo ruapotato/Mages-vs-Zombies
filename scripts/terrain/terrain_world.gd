@@ -23,11 +23,11 @@ var chunk_colliders: Dictionary = {}  # Key: "x,z" -> StaticBody3D
 var chunk_lod_levels: Dictionary = {}  # Key: "x,z" -> current LOD level
 
 # Configuration
-@export var view_distance: int = 8
+@export var view_distance: int = 12  # Increased view distance
 @export var world_seed: int = 12345
 
 # LOD distances (in chunks from player)
-const LOD_DISTANCES: Array = [3, 6, 10]
+const LOD_DISTANCES: Array = [4, 8, 12]  # Increased LOD distances
 
 # State
 var is_initialized: bool = false

@@ -23,6 +23,7 @@ WeatherManager="*res://scripts/autoload/weather_manager.gd"
 DayNightCycle="*res://scripts/autoload/day_night_cycle.gd"
 SpellRegistry="*res://scripts/autoload/spell_registry.gd"
 NetworkManager="*res://scripts/autoload/network_manager.gd"
+TextureGenerator="*res://scripts/autoload/texture_generator.gd"
 
 [display]
 

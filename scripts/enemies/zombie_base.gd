@@ -17,6 +17,9 @@ enum State {
 	DEAD
 }
 
+# Zombie type (determines texture and behavior)
+@export var zombie_type: String = "walker"
+
 # Basic stats (scaled by difficulty and time)
 @export_group("Base Stats")
 @export var base_health: float = 50.0
@@ -101,12 +104,19 @@ func _ready() -> void:
 		navigation_agent.height = 2.0
 		navigation_agent.max_speed = current_speed
 
-	# Setup sprite billboard
+	# Setup sprite billboard with procedural texture
 	if sprite:
 		sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST  # Pixel art style
-		sprite.pixel_size = 0.01
-		sprite.modulate = Color(0.5, 0.5, 0.5, 0.0)  # Start invisible for spawn animation
+		sprite.pixel_size = 0.02
+		sprite.modulate = Color(1.0, 1.0, 1.0, 0.0)  # Start invisible for spawn animation
+
+		# Generate zombie texture using ZombieTextureGenerator (static class)
+		sprite.texture = ZombieTextureGenerator.get_zombie_texture(zombie_type)
+
+		# Tank type is bigger
+		if zombie_type == "tank":
+			sprite.pixel_size = 0.03
 
 	# Setup areas
 	if attack_area:
@@ -408,7 +418,7 @@ func die() -> void:
 		detection_area.monitoring = false
 
 	# Emit signal
-	emit_signal("died", self)
+	died.emit(self)
 
 func _deal_damage_to_player() -> void:
 	if not target_player or not is_instance_valid(target_player):
@@ -418,11 +428,11 @@ func _deal_damage_to_player() -> void:
 	if global_position.distance_to(target_player.global_position) > attack_range * 1.2:
 		return
 
-	# Deal damage
+	# Deal damage (pass self as attacker)
 	if target_player.has_method("take_damage"):
 		target_player.take_damage(current_damage, self)
 
-	emit_signal("hit_player", self, current_damage)
+	hit_player.emit(self, current_damage)
 
 func _on_detection_area_body_entered(body: Node3D) -> void:
 	if body.is_in_group("player") or body.is_in_group("local_player"):

@@ -14,7 +14,8 @@ signal all_zombies_defeated()
 # Wave configuration
 @export_group("Wave Settings")
 @export var enable_waves: bool = true
-@export var wave_interval: float = 120.0  # 2 minutes between waves
+@export var wave_interval: float = 30.0  # 30 seconds between waves
+@export var first_wave_delay: float = 5.0  # Start first wave after 5 seconds
 @export var base_zombies_per_wave: int = 5
 @export var zombies_per_wave_increase: int = 2
 @export var max_active_zombies: int = 50
@@ -109,9 +110,10 @@ func _ready() -> void:
 	# Load zombie type scenes
 	_load_zombie_types()
 
-	# Start wave timer
+	# Start wave timer (use first_wave_delay for the first wave)
 	if enable_waves:
-		wave_timer = wave_interval
+		wave_timer = first_wave_delay
+		print("[ZombieHorde] First wave in %.1f seconds" % first_wave_delay)
 
 	# Connect to day/night cycle for difficulty updates
 	if DayNightCycle:
@@ -263,10 +265,15 @@ func _complete_wave() -> void:
 		emit_signal("all_zombies_defeated")
 
 func _spawn_random_zombie():  # -> ZombieBase
-	if not player:
+	if not player or not is_instance_valid(player):
 		_find_player()
 		if not player:
 			return null
+
+	# Find spawn position FIRST before creating zombie
+	var spawn_pos = _get_random_spawn_position()
+	if spawn_pos == Vector3.ZERO:
+		return null
 
 	# Determine zombie type based on probabilities
 	var zombie_type = _roll_zombie_type()
@@ -275,24 +282,18 @@ func _spawn_random_zombie():  # -> ZombieBase
 	if not zombie:
 		return null
 
-	# Find spawn position around player
-	var spawn_pos = _get_random_spawn_position()
-	if spawn_pos == Vector3.ZERO:
-		zombie.queue_free()
-		return null
+	# Add to scene FIRST (before setting position to avoid !is_inside_tree error)
+	if zombies_container:
+		zombies_container.add_child(zombie)
+	else:
+		add_child(zombie)
 
-	# Set position
+	# Now set position (zombie is in tree)
 	zombie.global_position = spawn_pos
 
 	# Apply difficulty scaling
 	if enable_difficulty_scaling:
 		_apply_difficulty_scaling(zombie)
-
-	# Add to scene (either to container or as child)
-	if zombies_container:
-		zombies_container.add_child(zombie)
-	else:
-		add_child(zombie)
 
 	# Track zombie (will be done by _on_zombie_added if using container)
 	if not zombies_container:

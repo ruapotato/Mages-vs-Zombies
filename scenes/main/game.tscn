@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3 uid="uid://c1m2v3r4t5y6u"]
+[gd_scene load_steps=7 format=3 uid="uid://c1m2v3r4t5y6u"]
 
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="1_player"]
 [ext_resource type="Script" path="res://scripts/terrain/terrain_world.gd" id="2_terrain"]
 [ext_resource type="Script" path="res://scripts/enemies/zombie_horde.gd" id="3_zombie_horde"]
 [ext_resource type="Script" path="res://scripts/main/game_controller.gd" id="4_game_controller"]
 [ext_resource type="PackedScene" path="res://scenes/ui/pause_menu.tscn" id="5_pause_menu"]
+[ext_resource type="Script" path="res://scripts/terrain/environment_spawner.gd" id="6_environment"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_main"]
 sky_top_color = Color(0.2, 0.3, 0.6, 1)
@@ -27,7 +28,7 @@ glow_enabled = true
 glow_intensity = 0.5
 fog_enabled = true
 fog_light_color = Color(0.4, 0.45, 0.5, 1)
-fog_density = 0.002
+fog_density = 0.0008
 
 [node name="Game" type="Node3D"]
 
@@ -43,8 +44,15 @@ shadow_blur = 1.5
 
 [node name="TerrainWorld" type="Node3D" parent="."]
 script = ExtResource("2_terrain")
-view_distance = 6
+view_distance = 12
 world_seed = 12345
+
+[node name="EnvironmentSpawner" type="Node3D" parent="."]
+script = ExtResource("6_environment")
+spawn_radius = 100.0
+max_trees = 250
+max_rocks = 120
+max_grass = 400
 
 [node name="ZombieHorde" type="Node3D" parent="."]
 script = ExtResource("3_zombie_horde")
