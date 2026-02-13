@@ -108,20 +108,23 @@ func _ready() -> void:
 	if sprite:
 		sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST  # Pixel art style
-		sprite.pixel_size = 0.02
-		sprite.modulate = Color(1.0, 1.0, 1.0, 0.0)  # Start invisible for spawn animation
+		sprite.pixel_size = 0.025  # Match ZvH size
+		sprite.no_depth_test = false
+		sprite.modulate = Color(0.6, 0.8, 0.6, 1.0)  # Visible immediately, greenish tint
 
 		# Generate zombie texture using TextureGenerator autoload
 		if TextureGenerator and TextureGenerator.has_method("generate_zombie_texture"):
 			sprite.texture = TextureGenerator.generate_zombie_texture(zombie_type)
+			print("[Zombie] Generated texture for type: %s" % zombie_type)
 		else:
 			# Fallback - create simple placeholder texture
-			var img = Image.create(32, 48, false, Image.FORMAT_RGBA8)
+			var img = Image.create(64, 96, false, Image.FORMAT_RGBA8)
 			img.fill(Color(0.3, 0.5, 0.3))  # Greenish zombie
 			sprite.texture = ImageTexture.create_from_image(img)
+			print("[Zombie] Using fallback texture")
 
-		# Tank type is bigger
-		if zombie_type == "tank":
+		# Tank/brute type is bigger
+		if zombie_type == "brute" or zombie_type == "tank":
 			sprite.pixel_size = 0.03
 
 	# Setup areas
@@ -186,15 +189,13 @@ func _process_spawning(delta: float) -> void:
 	spawn_timer += delta
 	var spawn_progress = min(spawn_timer / SPAWN_DURATION, 1.0)
 
-	# Fade in sprite
-	if sprite:
-		sprite.modulate = Color(0.6, 0.8, 0.6, spawn_progress)  # Greenish zombie tint
-
-	# Scale up from ground
-	scale = Vector3.ONE * spawn_progress
+	# Scale up from ground (sprite already visible)
+	scale = Vector3.ONE * (0.5 + spawn_progress * 0.5)  # Start at 50% scale
 
 	if spawn_progress >= 1.0:
+		scale = Vector3.ONE
 		current_state = State.IDLE
+		print("[Zombie] Spawn complete, now IDLE at %v" % global_position)
 
 func _process_idle(delta: float) -> void:
 	# Simplified AI for distant zombies (LOD)
