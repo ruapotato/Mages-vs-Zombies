@@ -5,6 +5,7 @@
 [ext_resource type="Script" path="res://scripts/enemies/zombie_horde.gd" id="3_zombie_horde"]
 [ext_resource type="Script" path="res://scripts/main/game_controller.gd" id="4_game_controller"]
 [ext_resource type="PackedScene" path="res://scenes/ui/pause_menu.tscn" id="5_pause_menu"]
+[ext_resource type="PackedScene" uid="uid://game_hud_001" path="res://scenes/ui/game_hud.tscn" id="7_game_hud"]
 [ext_resource type="Script" path="res://scripts/terrain/environment_spawner.gd" id="6_environment"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_main"]
@@ -64,5 +65,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 100, 0)
 script = ExtResource("4_game_controller")
 
 [node name="PauseMenu" parent="." instance=ExtResource("5_pause_menu")]
+
+[node name="GameHUD" parent="." instance=ExtResource("7_game_hud")]
 
 [editable path="Player"]

@@ -348,41 +348,36 @@ func _get_random_spawn_position() -> Vector3:
 	if not player:
 		return Vector3.ZERO
 
-	var attempts = 0
-	var max_attempts = 20
+	# Random angle and distance
+	var angle = randf() * TAU
+	var distance = randf_range(spawn_radius_min, spawn_radius_max)
 
-	while attempts < max_attempts:
-		# Random angle
-		var angle = randf() * TAU
-		# Random distance
-		var distance = randf_range(spawn_radius_min, spawn_radius_max)
+	# Calculate XZ position around player
+	var spawn_x = player.global_position.x + cos(angle) * distance
+	var spawn_z = player.global_position.z + sin(angle) * distance
 
-		# Calculate position
-		var offset = Vector3(
-			cos(angle) * distance,
-			spawn_height_offset,
-			sin(angle) * distance
-		)
+	# Try to get terrain height from TerrainWorld
+	var terrain_nodes = get_tree().get_nodes_in_group("terrain_world")
+	if terrain_nodes.size() > 0:
+		var terrain = terrain_nodes[0]
+		if terrain.has_method("get_terrain_height"):
+			var height = terrain.get_terrain_height(Vector2(spawn_x, spawn_z))
+			return Vector3(spawn_x, height + spawn_height_offset, spawn_z)
 
-		var spawn_pos = player.global_position + offset
-
-		# Check if position is valid (raycast to find ground)
-		var space_state = get_world_3d().direct_space_state
-		var query = PhysicsRayQueryParameters3D.create(
-			spawn_pos + Vector3.UP * 10,
-			spawn_pos + Vector3.DOWN * 20
-		)
+	# Fallback: Try raycast with larger range
+	var space_state = get_world_3d().direct_space_state
+	if space_state:
+		var ray_start = Vector3(spawn_x, player.global_position.y + 50, spawn_z)
+		var ray_end = Vector3(spawn_x, player.global_position.y - 100, spawn_z)
+		var query = PhysicsRayQueryParameters3D.create(ray_start, ray_end)
 		query.collision_mask = 1  # World layer
 
 		var result = space_state.intersect_ray(query)
 		if result:
-			# Found ground, spawn slightly above it
 			return result.position + Vector3.UP * spawn_height_offset
 
-		attempts += 1
-
-	# If no valid position found, spawn at a fallback position
-	return player.global_position + Vector3.FORWARD * spawn_radius_min + Vector3.UP * spawn_height_offset
+	# Last fallback: spawn at player's Y level
+	return Vector3(spawn_x, player.global_position.y + spawn_height_offset, spawn_z)
 
 func _apply_difficulty_scaling(zombie) -> void:  # ZombieBase
 	# Calculate difficulty based on current day

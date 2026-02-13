@@ -24,3 +24,17 @@ far = 500.0
 
 [node name="SpellSpawnPoint" type="Marker3D" parent="CameraMount"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1)
+
+[node name="MageSprite" type="Sprite3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+billboard = 1
+texture_filter = 0
+alpha_cut = 1
+pixel_size = 0.025
+
+[node name="StaffSprite" type="Sprite3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, 1.2, 0)
+billboard = 1
+texture_filter = 0
+alpha_cut = 1
+pixel_size = 0.02

@@ -8,6 +8,9 @@ class_name PlayerController
 @onready var camera: Camera3D = $CameraMount/Camera3D
 @onready var camera_mount: Node3D = $CameraMount
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
+@onready var mage_sprite: Sprite3D = $MageSprite
+@onready var staff_sprite: Sprite3D = $StaffSprite
+@onready var spell_spawn_point: Marker3D = $CameraMount/SpellSpawnPoint
 
 # Movement parameters
 @export_group("Movement")
@@ -72,7 +75,22 @@ func _ready() -> void:
 	# Capture mouse
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
+	# Setup mage sprite (Paper Mario style - visible to others, not to self in first person)
+	_setup_mage_sprite()
+
 	print("[Player] First-person mage ready")
+
+
+func _setup_mage_sprite() -> void:
+	# Generate mage texture
+	if mage_sprite and TextureGenerator:
+		mage_sprite.texture = TextureGenerator.generate_mage_texture("blue", 0)
+		mage_sprite.visible = true  # Visible to other players/shadows
+
+	# Generate staff texture
+	if staff_sprite and TextureGenerator:
+		staff_sprite.texture = TextureGenerator.generate_staff_texture()
+		staff_sprite.visible = true
 
 
 func _input(event: InputEvent) -> void:
@@ -243,10 +261,34 @@ func take_damage(amount: float, _attacker: Node = null) -> void:
 	current_health = max(current_health, 0)
 	time_since_damage = 0.0
 
+	# Flash HUD red
+	var huds = get_tree().get_nodes_in_group("game_hud")
+	if huds.size() == 0:
+		# Find HUD by type
+		for node in get_tree().get_nodes_in_group(""):
+			if node.has_method("flash_damage"):
+				node.flash_damage(0.5)
+				break
+
+	# Camera shake effect
+	_apply_damage_shake()
+
 	print("Player took ", amount, " damage. Health: ", current_health, "/", max_health)
 
 	if current_health <= 0:
 		_die()
+
+
+func _apply_damage_shake() -> void:
+	if not camera_mount:
+		return
+
+	# Quick camera shake
+	var original_rotation = camera_mount.rotation
+	var shake_tween = create_tween()
+	shake_tween.tween_property(camera_mount, "rotation:z", original_rotation.z + 0.05, 0.03)
+	shake_tween.tween_property(camera_mount, "rotation:z", original_rotation.z - 0.03, 0.03)
+	shake_tween.tween_property(camera_mount, "rotation:z", original_rotation.z, 0.04)
 
 
 ## Heal player

@@ -387,6 +387,9 @@ func take_damage(amount: float, attacker: Node3D = null) -> void:
 	current_health -= amount
 	current_health = max(0, current_health)
 
+	# Spawn hit effect
+	_spawn_hit_effect(amount)
+
 	# Flash sprite white
 	if sprite:
 		sprite.modulate = Color.WHITE
@@ -399,6 +402,44 @@ func take_damage(amount: float, attacker: Node3D = null) -> void:
 	# Die if health depleted
 	if current_health <= 0:
 		die()
+
+
+func _spawn_hit_effect(damage_amount: float) -> void:
+	# Create hit effect at zombie position
+	var effect = Node3D.new()
+	get_tree().current_scene.add_child(effect)
+	effect.global_position = global_position + Vector3(0, 1.2, 0)
+
+	# Mesh flash
+	var mesh = MeshInstance3D.new()
+	var sphere = SphereMesh.new()
+	sphere.radius = 0.12
+	sphere.height = 0.24
+	mesh.mesh = sphere
+
+	var mat = StandardMaterial3D.new()
+	var hit_color = Color(1, 0.5, 0.2) if damage_amount < 50 else Color(1, 0.2, 0.1)
+	mat.albedo_color = hit_color
+	mat.emission_enabled = true
+	mat.emission = hit_color
+	mat.emission_energy_multiplier = 4.0
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mesh.material_override = mat
+	effect.add_child(mesh)
+
+	# Light
+	var light = OmniLight3D.new()
+	light.light_color = hit_color
+	light.light_energy = 2.0
+	light.omni_range = 2.0
+	effect.add_child(light)
+
+	# Animate and cleanup
+	var tween = effect.create_tween()
+	tween.tween_property(mesh, "scale", Vector3.ONE * 2.0, 0.1)
+	tween.parallel().tween_property(light, "light_energy", 0.0, 0.15)
+	tween.tween_property(mesh, "scale", Vector3.ZERO, 0.15)
+	tween.tween_callback(effect.queue_free)
 
 func die() -> void:
 	if current_state == State.DYING or current_state == State.DEAD:

@@ -890,6 +890,60 @@ func _draw_staff(img: Image, cx: int, by: int) -> void:
 				if py >= 0 and px >= 0 and px < 16:
 					img.set_pixel(px, py, Color(0.7, 0.4, 0.9) * (0.8 + randf() * 0.2))
 
+# ============================================
+# STAFF/WAND TEXTURE (16x64 pixels)
+# ============================================
+func generate_staff_texture(staff_type: String = "arcane") -> ImageTexture:
+	var cache_key := "staff_%s" % staff_type
+	if texture_cache.has(cache_key):
+		return texture_cache[cache_key]
+
+	var img := Image.create(16, 64, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	var cx := 8
+	var by := 60
+
+	# Staff shaft (wood)
+	for y in range(15, by):
+		for dx in range(-1, 2):
+			var px := cx + dx
+			if px >= 0 and px < 16:
+				var shade := 0.85 + randf() * 0.15
+				img.set_pixel(px, y, Color(0.45, 0.3, 0.15) * shade)
+
+	# Crystal/gem head based on type
+	var gem_color: Color
+	match staff_type:
+		"fire":
+			gem_color = Color(1.0, 0.3, 0.1)
+		"ice":
+			gem_color = Color(0.3, 0.7, 1.0)
+		"lightning":
+			gem_color = Color(1.0, 1.0, 0.3)
+		"arcane", _:
+			gem_color = Color(0.6, 0.3, 0.9)
+
+	# Crystal shape
+	for dy in range(-10, 5):
+		for dx in range(-4, 5):
+			var dist: float = sqrt(dx * dx + dy * dy)
+			if dist < 5:
+				var px := cx + dx
+				var py := 12 + dy
+				if py >= 0 and px >= 0 and px < 16:
+					var brightness := 0.7 + (1.0 - dist / 5.0) * 0.3 + randf() * 0.1
+					img.set_pixel(px, py, gem_color * brightness)
+
+	# Crystal glow/shine
+	img.set_pixel(cx - 1, 8, Color(1, 1, 1, 0.8))
+	img.set_pixel(cx, 7, Color(1, 1, 1, 0.9))
+
+	var tex := ImageTexture.create_from_image(img)
+	texture_cache[cache_key] = tex
+	return tex
+
+
 # Clear cache if needed
 func clear_cache() -> void:
 	texture_cache.clear()
