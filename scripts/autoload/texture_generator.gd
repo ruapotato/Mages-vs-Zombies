@@ -182,8 +182,8 @@ func _draw_star(img: Image, cx: int, cy: int, color: Color) -> void:
 		Vector2i(-1, -1)
 	]
 	for p in points:
-		var px := cx + p.x
-		var py := cy + p.y
+		var px: int = cx + p.x
+		var py: int = cy + p.y
 		if px >= 0 and px < 64 and py >= 0 and py < 96:
 			img.set_pixel(px, py, color)
 
@@ -295,17 +295,17 @@ func _draw_brute_zombie(img: Image, cx: int, by: int, colors: Array) -> void:
 	for leg_offset in [-10, 10]:
 		for y in range(by - 15, by):
 			for dx in range(-6, 6):
-				var px := cx + leg_offset + dx
+				var px: int = cx + leg_offset + dx
 				if px >= 0 and px < img.get_width():
 					img.set_pixel(px, y, colors[2])
 
 	# Huge arms
 	for arm_side in [-1, 1]:
 		for i in range(25):
-			var px := cx + arm_side * (20 + i / 4)
-			var py := by - 55 + i
+			var px: int = cx + arm_side * (20 + i / 4)
+			var py: int = by - 55 + i
 			for dx in range(-4, 5):
-				var ppx := px + dx
+				var ppx: int = px + dx
 				if ppx >= 0 and ppx < img.get_width() and py >= 0 and py < img.get_height():
 					img.set_pixel(ppx, py, colors[1])
 
@@ -337,7 +337,7 @@ func _draw_mage_zombie(img: Image, cx: int, by: int, colors: Array) -> void:
 		var width: int = 12
 		for x in range(cx - width, cx + width):
 			if x >= 0 and x < img.get_width():
-				var c := colors[0]
+				var c: Color = colors[0]
 				c.a = alpha * 0.7
 				img.set_pixel(x, y, c)
 
@@ -384,10 +384,10 @@ func _draw_exploder_zombie(img: Image, cx: int, by: int, colors: Array) -> void:
 	# Short stubby arms
 	for arm_side in [-1, 1]:
 		for i in range(8):
-			var px := cx + arm_side * (12 + i / 3)
-			var py := by - 35 + i
+			var px: int = cx + arm_side * (12 + i / 3)
+			var py: int = by - 35 + i
 			for dx in range(-2, 3):
-				var ppx := px + dx
+				var ppx: int = px + dx
 				if ppx >= 0 and ppx < img.get_width() and py >= 0 and py < img.get_height():
 					img.set_pixel(ppx, py, colors[1])
 
@@ -417,7 +417,7 @@ func _draw_zombie_legs(img: Image, cx: int, by: int, colors: Array) -> void:
 		var leg_forward: int = 2 if leg_offset < 0 else -2
 		for y in range(by - 10, by):
 			for dx in range(-3, 3):
-				var px := cx + leg_offset + dx + leg_forward * (y - (by - 10)) / 10
+				var px: int = cx + leg_offset + dx + leg_forward * (y - (by - 10)) / 10
 				if px >= 0 and px < img.get_width():
 					img.set_pixel(px, y, colors[2])
 
@@ -425,10 +425,10 @@ func _draw_zombie_arms(img: Image, cx: int, y: int, colors: Array, reaching: boo
 	for arm_side in [-1, 1]:
 		var reach_ext: int = 8 if reaching else 0
 		for i in range(15 + reach_ext):
-			var px := cx + arm_side * (10 + i / 2)
-			var py := y + i / 3 - reach_ext / 4
+			var px: int = cx + arm_side * (10 + i / 2)
+			var py: int = y + i / 3 - reach_ext / 4
 			for dx in range(-2, 3):
-				var ppx := px + dx
+				var ppx: int = px + dx
 				if ppx >= 0 and ppx < img.get_width() and py >= 0 and py < img.get_height():
 					img.set_pixel(ppx, py, colors[1])
 
@@ -504,8 +504,8 @@ func _draw_oak_tree(img: Image, cx: int, by: int, trunk: Color, leaves: Color) -
 		for dy in range(-25, 20):
 			for dx in range(-20, 21):
 				if dx * dx + dy * dy < 350 + randf() * 100:
-					var px := center.x + dx
-					var py := center.y + dy
+					var px: int = center.x + dx
+					var py: int = center.y + dy
 					if px >= 0 and px < 64 and py >= 0 and py < 128:
 						var shade: float = 0.7 + randf() * 0.3
 						var existing: Color = img.get_pixel(px, py)

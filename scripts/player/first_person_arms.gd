@@ -1,202 +1,212 @@
 extends Node3D
 class_name FirstPersonArms
 
-## First-person arms and wand/staff visible from player's perspective
-## Rendered on a separate viewport layer so they don't clip through walls
+## First-person arms and wand visible from player's perspective
+## Uses 2D billboard sprites for Paper Mario style
 
-@onready var arm_left: MeshInstance3D
-@onready var arm_right: MeshInstance3D
-@onready var wand: MeshInstance3D
-@onready var wand_tip: MeshInstance3D
+# Billboard sprites
+var arm_sprite: Sprite3D
+var wand_sprite: Sprite3D
 
 # Animation state
 var idle_time: float = 0.0
 var cast_animation_time: float = 0.0
 var is_casting: bool = false
 
-# Wand tip glow color based on selected spell
-var current_spell_color: Color = Color(1, 0.5, 0.2)  # Fireball orange
+# Spell color for wand glow
+var current_spell_color: Color = Color(1, 0.5, 0.2)
 
-# Skin tone (matches player mage)
+# Colors
 var skin_color: Color = Color(0.96, 0.80, 0.69)
 var robe_color: Color = Color(0.2, 0.3, 0.7)
 
 
 func _ready() -> void:
-	_create_arms()
-	_create_wand()
+	_create_arm_sprite()
+	_create_wand_sprite()
 
 
 func _process(delta: float) -> void:
 	idle_time += delta
 
-	# Idle bob animation
 	if not is_casting:
 		_animate_idle(delta)
 	else:
 		_animate_cast(delta)
 
 
-func _create_arms() -> void:
-	# Left arm (less visible, off to the side)
-	arm_left = MeshInstance3D.new()
-	var left_mesh = CylinderMesh.new()
-	left_mesh.top_radius = 0.03
-	left_mesh.bottom_radius = 0.04
-	left_mesh.height = 0.35
-	arm_left.mesh = left_mesh
+func _create_arm_sprite() -> void:
+	arm_sprite = Sprite3D.new()
+	arm_sprite.name = "ArmSprite"
 
-	var left_mat = StandardMaterial3D.new()
-	left_mat.albedo_color = skin_color
-	arm_left.material_override = left_mat
+	# Generate arm texture
+	var img = Image.create(32, 48, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
 
-	arm_left.position = Vector3(-0.25, -0.3, -0.35)
-	arm_left.rotation_degrees = Vector3(-60, 0, 20)
-	add_child(arm_left)
+	# Draw right arm and hand holding position
+	_draw_arm_texture(img)
 
-	# Left sleeve
-	var sleeve_left = MeshInstance3D.new()
-	var sleeve_mesh_l = CylinderMesh.new()
-	sleeve_mesh_l.top_radius = 0.045
-	sleeve_mesh_l.bottom_radius = 0.05
-	sleeve_mesh_l.height = 0.15
-	sleeve_left.mesh = sleeve_mesh_l
+	arm_sprite.texture = ImageTexture.create_from_image(img)
+	arm_sprite.pixel_size = 0.01
+	arm_sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	arm_sprite.billboard = BaseMaterial3D.BILLBOARD_DISABLED  # Fixed relative to camera
+	arm_sprite.position = Vector3(0.15, -0.2, -0.35)
 
-	var sleeve_mat = StandardMaterial3D.new()
-	sleeve_mat.albedo_color = robe_color
-	sleeve_left.material_override = sleeve_mat
-	sleeve_left.position = Vector3(0, 0.15, 0)
-	arm_left.add_child(sleeve_left)
-
-	# Right arm (holding wand, more prominent)
-	arm_right = MeshInstance3D.new()
-	var right_mesh = CylinderMesh.new()
-	right_mesh.top_radius = 0.03
-	right_mesh.bottom_radius = 0.04
-	right_mesh.height = 0.4
-	arm_right.mesh = right_mesh
-
-	var right_mat = StandardMaterial3D.new()
-	right_mat.albedo_color = skin_color
-	arm_right.material_override = right_mat
-
-	arm_right.position = Vector3(0.2, -0.25, -0.4)
-	arm_right.rotation_degrees = Vector3(-45, -15, -10)
-	add_child(arm_right)
-
-	# Right sleeve
-	var sleeve_right = MeshInstance3D.new()
-	var sleeve_mesh_r = CylinderMesh.new()
-	sleeve_mesh_r.top_radius = 0.045
-	sleeve_mesh_r.bottom_radius = 0.05
-	sleeve_mesh_r.height = 0.15
-	sleeve_right.mesh = sleeve_mesh_r
-	sleeve_right.material_override = sleeve_mat
-	sleeve_right.position = Vector3(0, 0.18, 0)
-	arm_right.add_child(sleeve_right)
-
-	# Right hand (gripping wand)
-	var hand_right = MeshInstance3D.new()
-	var hand_mesh = SphereMesh.new()
-	hand_mesh.radius = 0.04
-	hand_mesh.height = 0.06
-	hand_right.mesh = hand_mesh
-	hand_right.material_override = left_mat  # Same skin material
-	hand_right.position = Vector3(0, -0.22, 0)
-	arm_right.add_child(hand_right)
+	add_child(arm_sprite)
 
 
-func _create_wand() -> void:
-	# Wand/staff attached to right hand
-	wand = MeshInstance3D.new()
-	var wand_mesh = CylinderMesh.new()
-	wand_mesh.top_radius = 0.015
-	wand_mesh.bottom_radius = 0.02
-	wand_mesh.height = 0.5
-	wand.mesh = wand_mesh
+func _draw_arm_texture(img: Image) -> void:
+	var cx: int = 16
+	var by: int = 44
 
-	var wand_mat = StandardMaterial3D.new()
-	wand_mat.albedo_color = Color(0.4, 0.25, 0.15)  # Wood color
-	wand.material_override = wand_mat
+	# Robe sleeve
+	for y in range(0, 20):
+		var width: int = 6 - y / 5
+		for dx in range(-width, width + 1):
+			var px: int = cx + dx
+			if px >= 0 and px < 32:
+				var shade: float = 0.85 + randf() * 0.15
+				img.set_pixel(px, y, robe_color * shade)
 
-	wand.position = Vector3(0.22, -0.35, -0.55)
-	wand.rotation_degrees = Vector3(-30, -10, 5)
-	add_child(wand)
+	# Arm/skin
+	for y in range(18, 35):
+		var width: int = 4 - (y - 18) / 8
+		for dx in range(-width, width + 1):
+			var px: int = cx + dx
+			if px >= 0 and px < 32:
+				var shade: float = 0.9 + randf() * 0.1
+				img.set_pixel(px, y, skin_color * shade)
 
-	# Crystal/gem at tip of wand
-	wand_tip = MeshInstance3D.new()
-	var tip_mesh = SphereMesh.new()
-	tip_mesh.radius = 0.035
-	tip_mesh.height = 0.05
-	wand_tip.mesh = tip_mesh
+	# Hand (gripping)
+	for dy in range(-3, 4):
+		for dx in range(-4, 5):
+			var dist: float = sqrt(dx * dx + dy * dy)
+			if dist < 4:
+				var px: int = cx + dx
+				var py: int = 38 + dy
+				if px >= 0 and px < 32 and py >= 0 and py < 48:
+					img.set_pixel(px, py, skin_color * 0.95)
 
-	var tip_mat = StandardMaterial3D.new()
-	tip_mat.albedo_color = current_spell_color
-	tip_mat.emission_enabled = true
-	tip_mat.emission = current_spell_color
-	tip_mat.emission_energy_multiplier = 2.0
-	wand_tip.material_override = tip_mat
+	# Fingers curled
+	for i in range(3):
+		var px: int = cx - 2 + i * 2
+		for py in range(40, 45):
+			if px >= 0 and px < 32:
+				img.set_pixel(px, py, skin_color * 0.9)
 
-	wand_tip.position = Vector3(0, 0.27, 0)
-	wand.add_child(wand_tip)
 
-	# Add a small light at wand tip
+func _create_wand_sprite() -> void:
+	wand_sprite = Sprite3D.new()
+	wand_sprite.name = "WandSprite"
+
+	# Generate wand texture
+	var img = Image.create(16, 48, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	_draw_wand_texture(img)
+
+	wand_sprite.texture = ImageTexture.create_from_image(img)
+	wand_sprite.pixel_size = 0.008
+	wand_sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	wand_sprite.billboard = BaseMaterial3D.BILLBOARD_DISABLED
+
+	# Position wand in hand
+	wand_sprite.position = Vector3(0.17, -0.22, -0.4)
+	wand_sprite.rotation_degrees = Vector3(0, 0, -15)
+
+	add_child(wand_sprite)
+
+	# Add glow light at wand tip
 	var tip_light = OmniLight3D.new()
+	tip_light.name = "WandGlow"
 	tip_light.light_color = current_spell_color
-	tip_light.light_energy = 0.5
-	tip_light.omni_range = 1.0
+	tip_light.light_energy = 0.8
+	tip_light.omni_range = 0.8
 	tip_light.omni_attenuation = 2.0
-	wand_tip.add_child(tip_light)
+	tip_light.position = Vector3(0, 0.18, 0)
+	wand_sprite.add_child(tip_light)
 
 
-func _animate_idle(delta: float) -> void:
-	# Gentle breathing/swaying animation
-	var bob = sin(idle_time * 1.5) * 0.01
-	var sway = sin(idle_time * 0.8) * 0.5
+func _draw_wand_texture(img: Image) -> void:
+	var cx: int = 8
+	var by: int = 44
 
-	position.y = bob
-	rotation_degrees.z = sway
+	# Wand shaft (wood)
+	var wood_color = Color(0.45, 0.3, 0.15)
+	for y in range(12, by):
+		for dx in range(-1, 2):
+			var px: int = cx + dx
+			if px >= 0 and px < 16:
+				var shade: float = 0.85 + randf() * 0.15
+				img.set_pixel(px, y, wood_color * shade)
 
-	# Subtle wand tip glow pulse
-	if wand_tip:
-		var mat = wand_tip.material_override as StandardMaterial3D
-		if mat:
-			mat.emission_energy_multiplier = 1.5 + sin(idle_time * 3.0) * 0.5
+	# Crystal/gem at tip
+	for dy in range(-8, 3):
+		for dx in range(-3, 4):
+			var dist: float = sqrt(dx * dx + dy * dy)
+			if dist < 4:
+				var px: int = cx + dx
+				var py: int = 10 + dy
+				if px >= 0 and px < 16 and py >= 0:
+					var brightness: float = 0.7 + (1.0 - dist / 4.0) * 0.3
+					img.set_pixel(px, py, current_spell_color * brightness)
+
+	# Crystal highlight
+	img.set_pixel(cx - 1, 6, Color(1, 1, 1, 0.9))
+	img.set_pixel(cx, 5, Color(1, 1, 1, 0.8))
+
+
+func _animate_idle(_delta: float) -> void:
+	# Gentle bob
+	var bob = sin(idle_time * 1.5) * 0.008
+	var sway = sin(idle_time * 0.8) * 0.3
+
+	if arm_sprite:
+		arm_sprite.position.y = -0.2 + bob
+
+	if wand_sprite:
+		wand_sprite.position.y = -0.22 + bob
+		wand_sprite.rotation_degrees.z = -15 + sway
+
+	# Pulse wand glow
+	var glow = wand_sprite.get_node_or_null("WandGlow") as OmniLight3D
+	if glow:
+		glow.light_energy = 0.6 + sin(idle_time * 3.0) * 0.3
 
 
 func _animate_cast(delta: float) -> void:
 	cast_animation_time += delta
 
-	# Quick forward thrust then return
-	var progress = cast_animation_time / 0.3  # 0.3 second animation
+	var progress = cast_animation_time / 0.25  # 0.25 second animation
 
 	if progress < 0.5:
 		# Thrust forward
-		var thrust = progress * 2.0  # 0 to 1 in first half
-		arm_right.rotation_degrees.x = -45 - thrust * 30
-		wand.position.z = -0.55 - thrust * 0.15
+		var thrust = progress * 2.0
+		if wand_sprite:
+			wand_sprite.position.z = -0.4 - thrust * 0.1
+			wand_sprite.rotation_degrees.x = -thrust * 20
 
-		# Brighten wand tip
-		if wand_tip:
-			var mat = wand_tip.material_override as StandardMaterial3D
-			if mat:
-				mat.emission_energy_multiplier = 2.0 + thrust * 6.0
+		# Brighten glow
+		var glow = wand_sprite.get_node_or_null("WandGlow") as OmniLight3D
+		if glow:
+			glow.light_energy = 0.8 + thrust * 3.0
 	else:
 		# Return
-		var ret = (progress - 0.5) * 2.0  # 0 to 1 in second half
-		arm_right.rotation_degrees.x = -75 + ret * 30
-		wand.position.z = -0.7 + ret * 0.15
+		var ret = (progress - 0.5) * 2.0
+		if wand_sprite:
+			wand_sprite.position.z = -0.5 + ret * 0.1
+			wand_sprite.rotation_degrees.x = -20 + ret * 20
 
-		if wand_tip:
-			var mat = wand_tip.material_override as StandardMaterial3D
-			if mat:
-				mat.emission_energy_multiplier = 8.0 - ret * 6.0
+		var glow = wand_sprite.get_node_or_null("WandGlow") as OmniLight3D
+		if glow:
+			glow.light_energy = 3.8 - ret * 3.0
 
 	if progress >= 1.0:
 		is_casting = false
 		cast_animation_time = 0.0
-		arm_right.rotation_degrees.x = -45
-		wand.position.z = -0.55
+		if wand_sprite:
+			wand_sprite.position.z = -0.4
+			wand_sprite.rotation_degrees.x = 0
 
 
 func play_cast_animation() -> void:
@@ -207,40 +217,33 @@ func play_cast_animation() -> void:
 func set_spell_color(color: Color) -> void:
 	current_spell_color = color
 
-	if wand_tip:
-		var mat = wand_tip.material_override as StandardMaterial3D
-		if mat:
-			mat.albedo_color = color
-			mat.emission = color
+	# Update wand texture
+	if wand_sprite:
+		var img = Image.create(16, 48, false, Image.FORMAT_RGBA8)
+		img.fill(Color(0, 0, 0, 0))
+		_draw_wand_texture(img)
+		wand_sprite.texture = ImageTexture.create_from_image(img)
 
-		# Update light color
-		for child in wand_tip.get_children():
-			if child is OmniLight3D:
-				child.light_color = color
+	# Update light color
+	if wand_sprite:
+		var glow = wand_sprite.get_node_or_null("WandGlow") as OmniLight3D
+		if glow:
+			glow.light_color = color
 
 
 func set_skin_tone(skin: Color) -> void:
 	skin_color = skin
-
-	if arm_left:
-		var mat = arm_left.material_override as StandardMaterial3D
-		if mat:
-			mat.albedo_color = skin
-
-	if arm_right:
-		var mat = arm_right.material_override as StandardMaterial3D
-		if mat:
-			mat.albedo_color = skin
+	_regenerate_arm_texture()
 
 
 func set_robe_color(robe: Color) -> void:
 	robe_color = robe
+	_regenerate_arm_texture()
 
-	# Update sleeve colors
-	for arm in [arm_left, arm_right]:
-		if arm:
-			for child in arm.get_children():
-				if child is MeshInstance3D:
-					var mat = child.material_override as StandardMaterial3D
-					if mat and mat.albedo_color != skin_color:
-						mat.albedo_color = robe
+
+func _regenerate_arm_texture() -> void:
+	if arm_sprite:
+		var img = Image.create(32, 48, false, Image.FORMAT_RGBA8)
+		img.fill(Color(0, 0, 0, 0))
+		_draw_arm_texture(img)
+		arm_sprite.texture = ImageTexture.create_from_image(img)

@@ -317,11 +317,23 @@ func _start_threaded_mesh_updates() -> void:
 
 ## Threaded mesh generation
 func _generate_mesh_threaded(chunk_key: String, chunk, neighbors: Dictionary, lod_level: int = 0) -> void:
+	# Safety check - mesh_generator must exist
+	if not mesh_generator:
+		mesh_result_mutex.lock()
+		completed_mesh_results.append({
+			"chunk_key": chunk_key,
+			"mesh": null,
+			"collision_shape": null,
+			"lod_level": lod_level
+		})
+		mesh_result_mutex.unlock()
+		return
+
 	var mesh: ArrayMesh = mesh_generator.generate_mesh(chunk, neighbors, lod_level)
 	var collision_shape: ConcavePolygonShape3D = null
 
 	# Only generate collision for high detail chunks (LOD 0 and 1)
-	if mesh and lod_level <= 1:
+	if mesh and lod_level <= 1 and mesh_generator:
 		collision_shape = mesh_generator.generate_collision_shape(mesh)
 
 	mesh_result_mutex.lock()

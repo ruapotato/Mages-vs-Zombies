@@ -11,7 +11,7 @@ class_name PlayerController
 @onready var mage_sprite: Sprite3D = $MageSprite
 @onready var staff_sprite: Sprite3D = $StaffSprite
 @onready var spell_spawn_point: Marker3D = $CameraMount/SpellSpawnPoint
-@onready var first_person_arms: FirstPersonArms = $CameraMount/Camera3D/FirstPersonArms
+@onready var first_person_arms: Node3D = $CameraMount/Camera3D/FirstPersonArms
 
 # Movement parameters
 @export_group("Movement")
@@ -100,9 +100,12 @@ func _setup_mage_sprite() -> void:
 func _setup_first_person_arms() -> void:
 	# Create first-person arms if not already present
 	if not first_person_arms and camera:
-		first_person_arms = FirstPersonArms.new()
-		first_person_arms.name = "FirstPersonArms"
-		camera.add_child(first_person_arms)
+		var arms_script = load("res://scripts/player/first_person_arms.gd")
+		if arms_script:
+			first_person_arms = Node3D.new()
+			first_person_arms.set_script(arms_script)
+			first_person_arms.name = "FirstPersonArms"
+			camera.add_child(first_person_arms)
 
 	# Set spell color based on current slot
 	if first_person_arms:
