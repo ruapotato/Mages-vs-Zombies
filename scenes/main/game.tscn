@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://c1m2v3r4t5y6u"]
+[gd_scene load_steps=10 format=3 uid="uid://c1m2v3r4t5y6u"]
 
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="1_player"]
 [ext_resource type="Script" path="res://scripts/terrain/terrain_world.gd" id="2_terrain"]
@@ -7,25 +7,16 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/pause_menu.tscn" id="5_pause_menu"]
 [ext_resource type="Script" path="res://scripts/terrain/environment_spawner.gd" id="6_environment"]
 [ext_resource type="PackedScene" uid="uid://game_hud_001" path="res://scenes/ui/game_hud.tscn" id="7_game_hud"]
-[ext_resource type="Shader" path="res://shaders/night_sky.gdshader" id="8_sky_shader"]
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
-shader = ExtResource("8_sky_shader")
-shader_parameter/sky_top_color = Vector3(0.3, 0.5, 0.9)
-shader_parameter/sky_horizon_color = Vector3(0.55, 0.7, 0.9)
-shader_parameter/ground_color = Vector3(0.2, 0.2, 0.2)
-shader_parameter/sun_direction = Vector3(0.3, 0.7, -0.5)
-shader_parameter/sun_color = Vector3(1.0, 0.95, 0.8)
-shader_parameter/sun_size = 0.05
-shader_parameter/sun_energy = 1.2
-shader_parameter/star_brightness = 0.0
-shader_parameter/moon_direction = Vector3(0.5, 0.3, -0.8)
-shader_parameter/moon_size = 0.045
-shader_parameter/moon_phase = 0.5
-shader_parameter/cloud_coverage = 0.0
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_main"]
+sky_top_color = Color(0.3, 0.5, 0.9, 1)
+sky_horizon_color = Color(0.55, 0.7, 0.9, 1)
+ground_bottom_color = Color(0.2, 0.2, 0.2, 1)
+ground_horizon_color = Color(0.4, 0.45, 0.5, 1)
+sun_angle_max = 30.0
+sun_curve = 0.15
 
 [sub_resource type="Sky" id="Sky_main"]
-sky_material = SubResource("ShaderMaterial_sky")
+sky_material = SubResource("ProceduralSkyMaterial_main")
 
 [sub_resource type="Environment" id="Environment_main"]
 background_mode = 2
