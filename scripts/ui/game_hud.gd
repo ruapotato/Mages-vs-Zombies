@@ -16,6 +16,7 @@ var spell_container: HBoxContainer
 var damage_overlay: ColorRect
 var wave_label: Label
 var zombie_count_label: Label
+var minimap: Control
 
 # Spell slot UI elements
 var spell_slots: Array[Control] = []
@@ -76,6 +77,9 @@ func _create_ui() -> void:
 
 	# === WAVE INFO (top left) ===
 	_create_wave_info(root)
+
+	# === MINIMAP (top right) ===
+	_create_minimap(root)
 
 
 func _create_crosshair(parent: Control) -> void:
@@ -367,6 +371,17 @@ func _update_wave_info() -> void:
 		elif "current_wave" in horde:
 			wave_label.text = "Wave %d" % horde.current_wave
 			zombie_count_label.text = "Zombies: %d" % horde.all_zombies.size()
+
+
+func _create_minimap(parent: Control) -> void:
+	# Load and instantiate minimap
+	var MiniMapScript = load("res://scripts/ui/minimap.gd")
+	minimap = Control.new()
+	minimap.set_script(MiniMapScript)
+	minimap.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	minimap.position = Vector2(-170, 20)
+	minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(minimap)
 
 
 ## Call this when player takes damage to flash red

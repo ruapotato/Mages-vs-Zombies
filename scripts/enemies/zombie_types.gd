@@ -84,16 +84,18 @@ class ZombieBrute extends ZombieBase:
 				shape.height *= 1.2
 
 # ============================================================================
-# MAGE ZOMBIE - Ranged magic attacks
+# MAGE ZOMBIE - Ranged magic attacks with slow homing purple orbs
 # ============================================================================
 class ZombieMage extends ZombieBase:
 
-	var magic_projectile_scene: PackedScene = null
-	var ranged_attack_range: float = 15.0
-	var projectile_speed: float = 10.0
-	var projectile_damage: float = 15.0
-	var magic_cooldown: float = 2.0
+	var mage_orb_scene: PackedScene = null
+	var ranged_attack_range: float = 18.0
+	var orb_damage: float = 20.0
+	var magic_cooldown: float = 3.0  # Slower cooldown for powerful orbs
 	var magic_timer: float = 0.0
+	var casting: bool = false
+	var cast_time: float = 0.0
+	const CAST_DURATION: float = 0.8  # Time to charge before firing
 
 	func _init() -> void:
 		# Ranged attacker
@@ -101,8 +103,8 @@ class ZombieMage extends ZombieBase:
 		base_speed = 2.5
 		base_damage = 5.0  # Melee damage is low
 		detection_range = 30.0  # Detects from farther
-		attack_range = 15.0  # Keeps distance
-		attack_cooldown = 2.0
+		attack_range = 18.0  # Keeps distance
+		attack_cooldown = 3.0
 
 		# Different animation style
 		walk_bob_speed = 6.0
@@ -114,9 +116,9 @@ class ZombieMage extends ZombieBase:
 			sprite.modulate = Color(0.6, 0.5, 0.9)  # Purple for mage
 			sprite.scale = Vector3.ONE * 0.95
 
-		# Try to load projectile scene
-		if ResourceLoader.exists("res://scenes/effects/zombie_magic_projectile.tscn"):
-			magic_projectile_scene = load("res://scenes/effects/zombie_magic_projectile.tscn")
+		# Load homing orb projectile scene
+		if ResourceLoader.exists("res://scenes/effects/mage_orb_projectile.tscn"):
+			mage_orb_scene = load("res://scenes/effects/mage_orb_projectile.tscn")
 
 	func _physics_process(delta: float) -> void:
 		super._physics_process(delta)
@@ -128,17 +130,18 @@ class ZombieMage extends ZombieBase:
 	func _process_attacking(delta: float) -> void:
 		if not target_player or not is_instance_valid(target_player):
 			current_state = State.IDLE
+			casting = false
 			return
 
 		var distance = global_position.distance_to(target_player.global_position)
 
 		# Mage keeps distance and casts spells
-		if distance < 5.0:
-			# Too close! Back away and return to chasing
+		if distance < 5.0 and not casting:
+			# Too close! Back away
 			current_state = State.CHASING
 			return
 
-		if distance > ranged_attack_range * 1.2:
+		if distance > ranged_attack_range * 1.3 and not casting:
 			current_state = State.CHASING
 			return
 
@@ -147,56 +150,66 @@ class ZombieMage extends ZombieBase:
 		var angle = atan2(direction_to_player.x, direction_to_player.z)
 		rotation.y = angle
 
-		# Stop moving
+		# Stop moving while casting
 		velocity.x = 0
 		velocity.z = 0
 
-		# Cast spell
-		if magic_timer <= 0:
-			_cast_magic_projectile()
-			magic_timer = magic_cooldown
+		# Casting logic
+		if casting:
+			cast_time += delta
+			# Charging animation - raise arms and glow
+			if sprite:
+				var charge_progress = cast_time / CAST_DURATION
+				sprite.modulate = Color(0.6, 0.5, 0.9).lerp(Color(1.0, 0.7, 1.0), charge_progress)
+				sprite.position.y = base_sprite_y + charge_progress * 0.15
+				sprite.scale = Vector3.ONE * (0.95 + charge_progress * 0.1)
 
-		# Visual casting animation
-		animation_time += delta * 3.0
-		if sprite:
-			sprite.position.y = abs(sin(animation_time) * 0.2)
-			sprite.scale = Vector3.ONE * (0.95 + sin(animation_time) * 0.05)
+			if cast_time >= CAST_DURATION:
+				_fire_orb()
+				casting = false
+				cast_time = 0.0
+				magic_timer = magic_cooldown
+				if sprite:
+					sprite.modulate = Color(0.6, 0.5, 0.9)
+		elif magic_timer <= 0:
+			# Start casting
+			casting = true
+			cast_time = 0.0
+		else:
+			# Idle animation while waiting for cooldown
+			anim_time += delta * 3.0
+			if sprite:
+				sprite.position.y = base_sprite_y + sin(anim_time) * 0.03
+				sprite.scale = Vector3.ONE * 0.95
 
-	func _cast_magic_projectile() -> void:
+	func _fire_orb() -> void:
 		if not target_player or not is_instance_valid(target_player):
 			return
 
-		# Create projectile
-		var projectile: Node3D = null
+		var orb: Node3D = null
 
-		if magic_projectile_scene:
-			projectile = magic_projectile_scene.instantiate()
+		if mage_orb_scene:
+			orb = mage_orb_scene.instantiate()
 		else:
-			# Fallback: create simple projectile
-			projectile = _create_simple_projectile()
+			# Fallback: use the orb script directly
+			orb = Area3D.new()
+			var orb_script = load("res://scripts/enemies/mage_orb_projectile.gd")
+			if orb_script:
+				orb.set_script(orb_script)
+			else:
+				orb.queue_free()
+				return
 
-		if not projectile:
-			return
+		# Position orb in front of mage at head height
+		get_tree().root.add_child(orb)
+		orb.global_position = global_position + Vector3.UP * 1.6
 
-		# Position projectile
-		get_tree().root.add_child(projectile)
-		projectile.global_position = global_position + Vector3.UP * 1.5
+		# Calculate initial direction toward player
+		var direction = (target_player.global_position + Vector3.UP - global_position).normalized()
 
-		# Set projectile direction and damage
-		var direction = (target_player.global_position - global_position).normalized()
-
-		if projectile.has_method("initialize"):
-			projectile.initialize(direction, projectile_speed, projectile_damage, self)
-		elif "direction" in projectile:
-			projectile.direction = direction
-			projectile.speed = projectile_speed
-			projectile.damage = projectile_damage
-
-	func _create_simple_projectile() -> Node3D:
-		# Simple magic projectile fallback
-		var projectile = Node3D.new()
-		projectile.set_script(preload("res://scripts/enemies/zombie_types.gd").SimpleMagicProjectile)
-		return projectile
+		# Initialize orb
+		if orb.has_method("initialize"):
+			orb.initialize(direction, self, orb_damage)
 
 # ============================================================================
 # EXPLODER - Explodes on death, dealing area damage

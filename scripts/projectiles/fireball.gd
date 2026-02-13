@@ -25,6 +25,9 @@ var trail_particles: GPUParticles3D
 
 
 func _ready() -> void:
+	add_to_group("player_spells")
+	add_to_group("player_projectiles")
+
 	# Setup collision
 	collision_layer = 8  # Projectile layer
 	collision_mask = 1 | 4  # World and Enemy layers
@@ -176,6 +179,10 @@ func setup(direction: Vector3, caster: Node = null) -> void:
 
 func setup_simple(direction: Vector3, caster: Node) -> void:
 	setup(direction, caster)
+
+
+func get_damage() -> float:
+	return damage
 
 
 func _on_body_entered(body: Node3D) -> void:

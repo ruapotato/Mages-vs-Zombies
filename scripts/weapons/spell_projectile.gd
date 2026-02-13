@@ -38,6 +38,9 @@ var collision_shape: CollisionShape3D = null
 
 
 func _ready() -> void:
+	add_to_group("player_spells")
+	add_to_group("player_projectiles")
+
 	_setup_projectile()
 	_setup_physics()
 
@@ -329,3 +332,7 @@ func _on_lifetime_expired() -> void:
 
 func _destroy() -> void:
 	queue_free()
+
+
+func get_damage() -> float:
+	return damage
