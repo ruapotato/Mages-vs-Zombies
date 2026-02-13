@@ -765,11 +765,11 @@ func _cleanup_dead_zombies() -> void:
 
 	all_zombies = valid_zombies
 
-func _on_zombie_died(zombie) -> void:  # ZombieBase
+func _on_zombie_died(zombie: ZombieBase, was_headshot: bool = false, _hit_position: Vector3 = Vector3.ZERO) -> void:
 	total_zombies_killed += 1
 
-	# Emit signal with default values if not multiplayer
-	zombie_died.emit(zombie, 0, false)
+	# Emit signal with headshot info
+	zombie_died.emit(zombie, 0, was_headshot)
 
 	# Remove from active tracking
 	var idx = all_zombies.find(zombie)

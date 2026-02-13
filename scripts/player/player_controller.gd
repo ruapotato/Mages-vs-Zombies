@@ -318,10 +318,24 @@ func _spawn_projectile(spawn_pos: Vector3, direction: Vector3, spell_name: Strin
 			if "speed" in spell_instance:
 				spell_instance.speed = 50.0
 
+		# Raycast from camera center to find where crosshair actually hits
+		var aim_direction := direction
+		if camera:
+			var space_state := get_world_3d().direct_space_state
+			var from := camera.global_position
+			var to := from + direction * 200.0
+			var query := PhysicsRayQueryParameters3D.create(from, to)
+			query.collision_mask = 0b1111  # World, player, enemy, interactable
+			query.exclude = [self]
+			var result := space_state.intersect_ray(query)
+			if result:
+				# Aim from spawn point toward the hit point
+				aim_direction = (result.position - spawn_pos).normalized()
+
 		if spell_instance.has_method("setup_simple"):
-			spell_instance.setup_simple(direction, self)
+			spell_instance.setup_simple(aim_direction, self)
 		elif "velocity" in spell_instance:
-			spell_instance.velocity = direction * 25.0
+			spell_instance.velocity = aim_direction * 25.0
 
 
 func _cast_frost_nova() -> void:

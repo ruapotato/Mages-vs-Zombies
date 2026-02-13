@@ -539,13 +539,14 @@ func _draw_pine_tree(img: Image, cx: int, by: int, trunk: Color, leaves: Color) 
 			if px >= 0 and px < 64:
 				img.set_pixel(px, y, trunk * (0.85 + randf() * 0.15))
 
-	# Triangular pine layers
+	# Triangular pine layers - triangles point UP (wide at bottom, narrow at top)
 	for layer in range(4):
-		var layer_y: int = by - 45 - layer * 22
+		var layer_base_y: int = by - 45 - layer * 18  # Bottom of this layer
+		var layer_height: int = 25
 		var layer_width: int = 25 - layer * 4
-		for y in range(layer_y, layer_y + 25):
-			var progress: float = (y - layer_y) / 25.0
-			var width: int = int(layer_width * (1.0 - progress))
+		for y in range(layer_base_y - layer_height, layer_base_y):
+			var progress: float = float(layer_base_y - y) / float(layer_height)  # 0 at bottom, 1 at top
+			var width: int = int(layer_width * (1.0 - progress))  # Wide at bottom, narrow at top
 			for dx in range(-width, width + 1):
 				var px := cx + dx
 				if px >= 0 and px < 64 and y >= 0 and y < 128:
@@ -711,27 +712,28 @@ func _draw_frost_pine(img: Image, cx: int, by: int, trunk: Color, leaves: Color)
 				var ice: Color = trunk.lerp(Color(0.9, 0.95, 1.0), randf() * 0.3)
 				img.set_pixel(px, y, ice)
 
-	# Snow-covered pine layers
+	# Snow-covered pine layers - triangles point UP (wide at bottom, narrow at top)
 	for layer in range(5):
-		var layer_y: int = by - 40 - layer * 18
+		var layer_base_y: int = by - 40 - layer * 15  # Bottom of this layer
+		var layer_height: int = 20
 		var layer_width: int = 22 - layer * 3
-		for y in range(layer_y, layer_y + 20):
-			var progress: float = (y - layer_y) / 20.0
-			var width: int = int(layer_width * (1.0 - progress))
+		for y in range(layer_base_y - layer_height, layer_base_y):
+			var progress: float = float(layer_base_y - y) / float(layer_height)  # 0 at bottom, 1 at top
+			var width: int = int(layer_width * (1.0 - progress))  # Wide at bottom, narrow at top
 			for dx in range(-width, width + 1):
 				var px := cx + dx
 				if px >= 0 and px < 64 and y >= 0 and y < 128:
-					# Snow on top, darker underneath
-					var snow_amount: float = 1.0 - progress * 0.7
+					# Snow on top (near tip), darker underneath
+					var snow_amount: float = progress * 0.7  # More snow near the top
 					var color: Color = leaves.lerp(Color(1, 1, 1), snow_amount * 0.6)
 					img.set_pixel(px, y, color * (0.85 + randf() * 0.15))
 
-	# Snow cap
+	# Snow cap at very top
 	for dy in range(-8, 0):
 		var width: int = 3 - abs(dy) / 3
 		for dx in range(-width, width + 1):
 			var px := cx + dx
-			var py := by - 125 + dy
+			var py := by - 115 + dy
 			if px >= 0 and px < 64 and py >= 0:
 				img.set_pixel(px, py, Color(1, 1, 1))
 
