@@ -112,16 +112,9 @@ func _ready() -> void:
 		sprite.no_depth_test = false
 		sprite.modulate = Color(0.6, 0.8, 0.6, 1.0)  # Visible immediately, greenish tint
 
-		# Generate zombie texture using TextureGenerator autoload
-		if TextureGenerator and TextureGenerator.has_method("generate_zombie_texture"):
-			sprite.texture = TextureGenerator.generate_zombie_texture(zombie_type)
-			print("[Zombie] Generated texture for type: %s" % zombie_type)
-		else:
-			# Fallback - create simple placeholder texture
-			var img = Image.create(64, 96, false, Image.FORMAT_RGBA8)
-			img.fill(Color(0.3, 0.5, 0.3))  # Greenish zombie
-			sprite.texture = ImageTexture.create_from_image(img)
-			print("[Zombie] Using fallback texture")
+		# Generate zombie texture using ZvH-style generator
+		sprite.texture = ZombieTextureGenerator.get_zombie_texture(zombie_type)
+		print("[Zombie] Generated texture for type: %s" % zombie_type)
 
 		# Tank/brute type is bigger
 		if zombie_type == "brute" or zombie_type == "tank":
