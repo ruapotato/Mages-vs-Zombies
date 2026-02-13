@@ -22,6 +22,12 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
 [node name="Camera3D" type="Camera3D" parent="CameraMount" unique_id=763684677]
 far = 500.0
 
+[node name="AimRaycast" type="RayCast3D" parent="CameraMount/Camera3D"]
+target_position = Vector3(0, 0, -200)
+collision_mask = 7
+collide_with_areas = true
+collide_with_bodies = true
+
 [node name="FirstPersonArms" type="Node3D" parent="CameraMount/Camera3D" unique_id=906830487]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
 script = ExtResource("2_arms")

@@ -12,6 +12,7 @@ class_name PlayerController
 @onready var staff_sprite: Sprite3D = $StaffSprite
 @onready var spell_spawn_point: Marker3D = $CameraMount/SpellSpawnPoint
 @onready var first_person_arms: Node3D = $CameraMount/Camera3D/FirstPersonArms
+@onready var aim_raycast: RayCast3D = $CameraMount/Camera3D/AimRaycast
 
 # Movement parameters
 @export_group("Movement")
@@ -80,10 +81,32 @@ func _ready() -> void:
 	# Capture mouse
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
+	# Enable aim raycast
+	if aim_raycast:
+		aim_raycast.enabled = true
+
 	# Setup mage sprite (Paper Mario style - visible to others, not to self in first person)
 	_setup_mage_sprite()
 
 	print("[Player] First-person mage ready")
+
+
+## Get the point where the crosshair is aiming (for spell targeting)
+func get_aim_target() -> Dictionary:
+	if aim_raycast and aim_raycast.is_colliding():
+		return {
+			"position": aim_raycast.get_collision_point(),
+			"normal": aim_raycast.get_collision_normal(),
+			"collider": aim_raycast.get_collider()
+		}
+	# No hit - return a point far in front of camera
+	if camera:
+		return {
+			"position": camera.global_position - camera.global_transform.basis.z * 200.0,
+			"normal": Vector3.UP,
+			"collider": null
+		}
+	return {}
 
 
 func _setup_mage_sprite() -> void:
@@ -318,19 +341,11 @@ func _spawn_projectile(spawn_pos: Vector3, direction: Vector3, spell_name: Strin
 			if "speed" in spell_instance:
 				spell_instance.speed = 50.0
 
-		# Raycast from camera center to find where crosshair actually hits
+		# Use the aim raycast to find where crosshair actually hits
 		var aim_direction := direction
-		if camera:
-			var space_state := get_world_3d().direct_space_state
-			var from := camera.global_position
-			var to := from + direction * 200.0
-			var query := PhysicsRayQueryParameters3D.create(from, to)
-			query.collision_mask = 0b1111  # World, player, enemy, interactable
-			query.exclude = [self]
-			var result := space_state.intersect_ray(query)
-			if result:
-				# Aim from spawn point toward the hit point
-				aim_direction = (result.position - spawn_pos).normalized()
+		if aim_raycast and aim_raycast.is_colliding():
+			var hit_point := aim_raycast.get_collision_point()
+			aim_direction = (hit_point - spawn_pos).normalized()
 
 		if spell_instance.has_method("setup_simple"):
 			spell_instance.setup_simple(aim_direction, self)

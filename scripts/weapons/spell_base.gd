@@ -242,6 +242,17 @@ func raycast_from_camera(max_distance: float = 100.0) -> Dictionary:
 	if not owner_player:
 		return {}
 
+	# Use player's aim raycast if available
+	if owner_player.has_method("get_aim_target"):
+		var aim_result: Dictionary = owner_player.get_aim_target()
+		if not aim_result.is_empty() and aim_result.get("collider") != null:
+			return {
+				"position": aim_result.position,
+				"normal": aim_result.normal,
+				"collider": aim_result.collider
+			}
+
+	# Fallback to manual raycast
 	var camera: Camera3D = owner_player.get_node("CameraMount/Camera3D")
 	if not camera:
 		return {}
