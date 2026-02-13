@@ -1,7 +1,6 @@
 shader_type sky;
 
 // Dynamic sky shader with day/night cycle, stars, moon, and sun
-// Uses LIGHT0_DIRECTION and LIGHT0_ENERGY from DirectionalLight3D for sun position/brightness
 // Based on Hamberg sky system
 
 // Sky colors (set by DayNightCycle)
@@ -9,9 +8,11 @@ uniform vec3 sky_top_color : source_color = vec3(0.3, 0.6, 1.0);
 uniform vec3 sky_horizon_color : source_color = vec3(0.6, 0.75, 0.95);
 uniform vec3 ground_color : source_color = vec3(0.3, 0.25, 0.2);
 
-// Sun parameters - using LIGHT0_DIRECTION from DirectionalLight3D
+// Sun parameters (set by DayNightCycle)
+uniform vec3 sun_direction = vec3(0.3, 0.7, -0.5);
 uniform vec3 sun_color : source_color = vec3(1.0, 0.95, 0.85);
 uniform float sun_size : hint_range(0.01, 0.1) = 0.03;
+uniform float sun_energy : hint_range(0.0, 2.0) = 1.0;
 
 // Star parameters
 uniform float star_brightness : hint_range(0.0, 1.0) = 0.0;
@@ -217,6 +218,7 @@ float clouds(vec3 dir) {
 
 void sky() {
 	vec3 dir = EYEDIR;
+	vec3 norm_sun_dir = normalize(sun_direction);
 
 	// Sky gradient based on height
 	float horizon_blend = smoothstep(-0.1, 0.3, dir.y);
@@ -228,14 +230,14 @@ void sky() {
 		sky = mix(sky_horizon_color, ground_color, ground_blend);
 	}
 
-	// Sun - uses LIGHT0_DIRECTION from DirectionalLight3D (like Hamberg)
-	float sun_dist = distance(dir, LIGHT0_DIRECTION);
+	// Sun - using uniform sun_direction (set by DayNightCycle GDScript)
+	float sun_dist = distance(dir, norm_sun_dir);
 	float sun_disc = smoothstep(sun_size, sun_size * 0.5, sun_dist);
 	float sun_glow = smoothstep(sun_size * 4.0, sun_size, sun_dist) * 0.3;
 
 	// Only show sun above horizon
-	if (LIGHT0_DIRECTION.y > -0.1) {
-		sky += sun_color * (sun_disc + sun_glow) * LIGHT0_ENERGY;
+	if (norm_sun_dir.y > -0.1) {
+		sky += sun_color * (sun_disc + sun_glow) * sun_energy;
 	}
 
 	// Stars (only visible at night, above horizon)
@@ -281,11 +283,11 @@ void sky() {
 		vec3 cloud_base_color = mix(cloud_lit_color, cloud_dark_color, cloud_darkness);
 
 		// Clouds lit by sun
-		float sun_illumination = max(0.0, dot(dir, LIGHT0_DIRECTION));
+		float sun_illumination = max(0.0, dot(dir, norm_sun_dir));
 		vec3 cloud_col = cloud_base_color * (0.7 + sun_illumination * 0.3);
 
 		// At night, clouds are darker
-		float night_factor = 1.0 - clamp(LIGHT0_ENERGY, 0.0, 1.0);
+		float night_factor = 1.0 - clamp(sun_energy, 0.0, 1.0);
 		cloud_col = mix(cloud_col, vec3(0.15, 0.17, 0.25), night_factor * 0.7);
 
 		// Blend clouds over sky

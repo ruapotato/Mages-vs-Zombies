@@ -265,6 +265,10 @@ func _update_lighting() -> void:
 	if sky_material:
 		_update_sky()
 
+# Cached sun direction and energy for sky shader
+var _cached_sun_direction: Vector3 = Vector3(0.3, 0.7, -0.5)
+var _cached_sun_energy: float = 1.0
+
 func _update_sun_position() -> void:
 	# Sun completes a full 360° orbit over 24 hours
 	# Midnight (0:00) = sun directly below (nadir)
@@ -294,8 +298,10 @@ func _update_sun_position() -> void:
 	# Create sun position vector (where the sun actually is in the sky)
 	var sun_pos = Vector3(sun_x, sun_y, sun_z).normalized() * 100.0
 
+	# Cache sun direction for sky shader (normalized direction to the sun)
+	_cached_sun_direction = sun_pos.normalized()
+
 	# Point the directional light from sun position toward the world origin
-	# Note: Sky shader uses LIGHT0_DIRECTION directly from this DirectionalLight3D
 	if sun_pos.length() > 0.001:
 		# Handle edge case when sun is directly above/below
 		var up_vec = Vector3.FORWARD if abs(sun_pos.normalized().y) > 0.99 else Vector3.UP
@@ -337,6 +343,9 @@ func _update_sun_color() -> void:
 
 	sun_light.light_color = color
 	sun_light.light_energy = energy * biome_sun_multiplier
+
+	# Cache energy for sky shader
+	_cached_sun_energy = energy
 
 func _update_environment() -> void:
 	var env = world_environment.environment
@@ -454,12 +463,12 @@ func _update_sky() -> void:
 		star_brightness = 1.0
 
 	# Update shader parameters
-	# Note: sun_direction is no longer needed - shader uses LIGHT0_DIRECTION from DirectionalLight3D
-	# Note: time is no longer needed - shader uses built-in TIME
 	sky_material.set_shader_parameter("sky_top_color", Vector3(sky_top.r, sky_top.g, sky_top.b))
 	sky_material.set_shader_parameter("sky_horizon_color", Vector3(sky_horizon.r, sky_horizon.g, sky_horizon.b))
 	sky_material.set_shader_parameter("ground_color", Vector3(ground.r, ground.g, ground.b))
 	sky_material.set_shader_parameter("star_brightness", star_brightness)
+	sky_material.set_shader_parameter("sun_direction", _cached_sun_direction)
+	sky_material.set_shader_parameter("sun_energy", _cached_sun_energy)
 
 	# Update moon position and phase
 	_update_moon()
