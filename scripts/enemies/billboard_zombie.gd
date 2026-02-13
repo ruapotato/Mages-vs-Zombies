@@ -133,12 +133,15 @@ func _create_health_bar() -> void:
 	health_bar_sprite.position = Vector3(0, enemy_height + 0.15, 0)
 	health_bar_sprite.no_depth_test = true
 	health_bar_sprite.render_priority = 10
-	health_bar_sprite.visible = false
+	health_bar_sprite.visible = true  # Always visible
 	add_child(health_bar_sprite)
 
 	health_bar_image = Image.create(HEALTH_BAR_WIDTH, HEALTH_BAR_HEIGHT, false, Image.FORMAT_RGBA8)
 	health_bar_texture = ImageTexture.create_from_image(health_bar_image)
 	health_bar_sprite.texture = health_bar_texture
+
+	# Draw initial full health bar
+	_update_health_bar()
 
 
 func _update_health_bar() -> void:
