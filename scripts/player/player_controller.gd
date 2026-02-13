@@ -366,7 +366,9 @@ func _cast_frost_nova() -> void:
 		var dist := global_position.distance_to(enemy.global_position)
 		if dist <= aoe_radius:
 			if enemy.has_method("take_damage"):
-				enemy.take_damage(damage, self)
+				# AOE hits center mass
+				var hit_pos: Vector3 = enemy.global_position + Vector3(0, 0.9, 0)
+				enemy.take_damage(damage, self, hit_pos)
 			# Could add slow effect here
 
 	# Visual effect
@@ -386,7 +388,9 @@ func _cast_flame_wave() -> void:
 		var dist := global_position.distance_to(enemy.global_position)
 		if dist <= aoe_radius:
 			if enemy.has_method("take_damage"):
-				enemy.take_damage(damage, self)
+				# AOE hits center mass
+				var hit_pos: Vector3 = enemy.global_position + Vector3(0, 0.9, 0)
+				enemy.take_damage(damage, self, hit_pos)
 
 	# Visual effect
 	_create_aoe_effect(Color(1.0, 0.4, 0.1, 0.8), aoe_radius)

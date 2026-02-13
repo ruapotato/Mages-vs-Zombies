@@ -305,7 +305,8 @@ class ZombieExploder extends ZombieBase:
 					var distance = global_position.distance_to(body.global_position)
 					var damage_falloff = 1.0 - (distance / explosion_radius)
 					var damage = explosion_damage * 0.5 * damage_falloff  # Half damage to zombies
-					body.take_damage(damage, self)
+					var hit_pos = body.global_position + Vector3(0, 0.9, 0)
+					body.take_damage(damage, self, hit_pos)
 
 		# Create explosion visual effect
 		if explosion_scene:

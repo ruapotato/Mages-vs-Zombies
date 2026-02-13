@@ -213,7 +213,7 @@ func _hit(hit_target: Node = null) -> void:
 
 	# Deal damage to hit target
 	if hit_target and hit_target.has_method("take_damage"):
-		hit_target.take_damage(damage, owner_node)
+		hit_target.take_damage(damage, owner_node, global_position)
 
 	# AOE damage
 	_deal_explosion_damage()
@@ -248,7 +248,9 @@ func _deal_explosion_damage() -> void:
 			var distance = global_position.distance_to(collider.global_position)
 			var damage_falloff = 1.0 - (distance / explosion_radius)
 			var aoe_damage = damage * 0.5 * damage_falloff  # 50% of main damage for AOE
-			collider.take_damage(aoe_damage, owner_node)
+			# AOE hits center mass, not headshot
+			var hit_pos = collider.global_position + Vector3(0, 0.9, 0)
+			collider.take_damage(aoe_damage, owner_node, hit_pos)
 
 
 func _spawn_explosion() -> void:
