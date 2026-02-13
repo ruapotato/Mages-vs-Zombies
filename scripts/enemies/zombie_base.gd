@@ -111,7 +111,8 @@ func _ready() -> void:
 	# Setup attack timer
 	if attack_timer:
 		attack_timer.one_shot = true
-		attack_timer.timeout.connect(_on_attack_timer_timeout)
+		if not attack_timer.timeout.is_connected(_on_attack_timer_timeout):
+			attack_timer.timeout.connect(_on_attack_timer_timeout)
 
 	# Randomize animation offset so zombies don't sync
 	anim_time = randf() * TAU
