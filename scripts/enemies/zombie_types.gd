@@ -238,9 +238,12 @@ class ZombieExploder extends ZombieBase:
 			var pulse = 1.0 + sin(Time.get_ticks_msec() * 0.005) * 0.1
 			sprite.modulate = Color(1.0, 0.6, 0.3) * pulse
 
-		# Handle explosion countdown
+		# Handle explosion countdown with scale animation (no tweens)
 		if is_exploding:
 			explosion_timer -= delta
+			# Scale up during countdown
+			var progress := 1.0 - (explosion_timer / explosion_delay)
+			scale = Vector3.ONE * lerpf(1.0, 1.3, progress)
 			if explosion_timer <= 0:
 				_explode()
 
@@ -267,11 +270,14 @@ class ZombieExploder extends ZombieBase:
 		if detection_area:
 			detection_area.monitoring = false
 
-		# Scale up slightly before explosion
-		var tween = create_tween()
-		tween.tween_property(self, "scale", Vector3.ONE * 1.3, explosion_delay)
+		# Scale up animation will happen in _physics_process
 
 	func _explode() -> void:
+		# Prevent multiple explosions
+		if current_state == State.DEAD:
+			return
+		current_state = State.DEAD
+
 		# Deal area damage
 		var space_state = get_world_3d().direct_space_state
 
@@ -317,16 +323,16 @@ class ZombieExploder extends ZombieBase:
 			# Fallback: create simple explosion effect
 			_create_simple_explosion()
 
-		# Emit died signal
-		emit_signal("died", self)
+		# Emit died signal with proper arguments (zombie, was_headshot, hit_position)
+		emit_signal("died", self, last_hit_was_headshot, last_hit_position)
 
 		# Remove self
-		current_state = State.DEAD
 		queue_free()
 
 	func _create_simple_explosion() -> void:
-		# Simple visual explosion using particles or light
+		# Simple visual explosion using light - no tweens
 		var explosion = Node3D.new()
+		explosion.name = "SimpleExplosion"
 		get_tree().root.add_child(explosion)
 		explosion.global_position = global_position
 
@@ -337,10 +343,8 @@ class ZombieExploder extends ZombieBase:
 		light.omni_range = explosion_radius * 2
 		explosion.add_child(light)
 
-		# Fade out and remove
-		var tween = explosion.create_tween()
-		tween.tween_property(light, "light_energy", 0.0, 0.5)
-		tween.tween_callback(explosion.queue_free)
+		# Simple delayed cleanup using SceneTreeTimer (no tweens)
+		get_tree().create_timer(0.5).timeout.connect(explosion.queue_free)
 
 # ============================================================================
 # SIMPLE MAGIC PROJECTILE - Fallback for mage zombie

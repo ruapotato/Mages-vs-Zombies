@@ -4,6 +4,9 @@ class_name PlayerController
 ## First-person mage controller
 ## Based on Zombies-vs-Humans FPS controls
 
+# Preloaded resources
+const LightningMaterial = preload("res://resources/materials/lightning_material.tres")
+
 # Node references
 @onready var camera: Camera3D = $CameraMount/Camera3D
 @onready var camera_mount: Node3D = $CameraMount
@@ -56,6 +59,7 @@ var is_sprinting := false
 var is_aiming := false
 var has_double_jumped := false
 var build_mode := false
+var is_dead := false
 
 # Camera state
 var pitch := 0.0
@@ -68,6 +72,11 @@ var current_spell_slot := 0
 # Input
 var input_dir := Vector2.ZERO
 
+
+## AUTO-TEST: Disabled
+var _auto_test_lightning: bool = false
+var _auto_test_timer: float = 0.0
+var _auto_test_count: int = 0
 
 func _ready() -> void:
 	# Add to player group for zombie targeting
@@ -89,6 +98,122 @@ func _ready() -> void:
 	_setup_mage_sprite()
 
 	print("[Player] First-person mage ready")
+
+	# Pre-warm all spell effects to buffer graphics and catch errors
+	_prewarm_spell_effects()
+
+	if _auto_test_lightning:
+		print("[AUTO-TEST] Lightning auto-fire ENABLED - will fire every 0.5s")
+
+
+func _prewarm_spell_effects() -> void:
+	print("[Player] Pre-warming spell effects...")
+
+	# Test position far below ground so effects aren't visible
+	var test_pos := Vector3(0, -1000, 0)
+
+	# Test lightning bolt visual
+	print("[Player] Testing lightning bolt...")
+	_test_lightning_visual(test_pos)
+
+	# Test ground ring (frost nova / flame wave)
+	print("[Player] Testing ground ring (frost)...")
+	_test_ground_ring(Color(0.4, 0.8, 1.0), 8.0, test_pos)
+
+	print("[Player] Testing ground ring (fire)...")
+	_test_ground_ring(Color(1.0, 0.4, 0.1), 6.0, test_pos)
+
+	# Test heal effect
+	print("[Player] Testing heal effect...")
+	_test_heal_effect(test_pos)
+
+	print("[Player] Spell effects pre-warmed successfully!")
+
+
+func _test_lightning_visual(pos: Vector3) -> void:
+	# Create and immediately destroy to test code path
+	var bolt := MeshInstance3D.new()
+	bolt.name = "TestLightningBolt"
+	var cylinder := CylinderMesh.new()
+	cylinder.top_radius = 0.15
+	cylinder.bottom_radius = 0.15
+	cylinder.height = 30.0
+	bolt.mesh = cylinder
+
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(1.0, 1.0, 0.7, 0.9)
+	material.emission_enabled = true
+	material.emission = Color(1.0, 1.0, 0.5)
+	material.emission_energy_multiplier = 5.0
+	bolt.material_override = material
+
+	var flash := OmniLight3D.new()
+	flash.light_color = Color(0.8, 0.8, 1.0)
+	flash.light_energy = 10.0
+	flash.omni_range = 15.0
+	bolt.add_child(flash)
+
+	add_child(bolt)
+	bolt.global_position = pos
+
+	# Immediately free
+	bolt.queue_free()
+	print("[Player] Lightning visual test passed")
+
+
+func _test_ground_ring(color: Color, radius: float, pos: Vector3) -> void:
+	var effect := MeshInstance3D.new()
+	effect.name = "TestGroundRing"
+
+	var disc := CylinderMesh.new()
+	disc.top_radius = radius
+	disc.bottom_radius = radius
+	disc.height = 0.1
+	effect.mesh = disc
+
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(color.r, color.g, color.b, 0.6)
+	material.emission_enabled = true
+	material.emission = color
+	material.emission_energy_multiplier = 3.0
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	effect.material_override = material
+
+	var light := OmniLight3D.new()
+	light.light_color = color
+	light.light_energy = 4.0
+	light.omni_range = radius * 1.5
+	effect.add_child(light)
+
+	add_child(effect)
+	effect.global_position = pos
+
+	effect.queue_free()
+	print("[Player] Ground ring test passed")
+
+
+func _test_heal_effect(pos: Vector3) -> void:
+	var effect := MeshInstance3D.new()
+	effect.name = "TestHealEffect"
+	var sphere := SphereMesh.new()
+	sphere.radius = 1.0
+	sphere.height = 2.0
+	effect.mesh = sphere
+
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.2, 1.0, 0.3, 0.5)
+	material.emission_enabled = true
+	material.emission = Color(0.3, 1.0, 0.4)
+	material.emission_energy_multiplier = 2.0
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	effect.material_override = material
+
+	add_child(effect)
+	effect.global_position = pos
+
+	effect.queue_free()
+	print("[Player] Heal effect test passed")
 
 
 ## Get the point where the crosshair is aiming (for spell targeting)
@@ -181,7 +306,33 @@ func _input(event: InputEvent) -> void:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
+# Track temporary effects for manual cleanup
+var _temp_effects: Array[Dictionary] = []
+
 func _physics_process(delta: float) -> void:
+	# AUTO-TEST: Fire lightning automatically (disabled)
+	if _auto_test_lightning:
+		_auto_test_timer += delta
+		if _auto_test_timer >= 0.5:
+			_auto_test_timer = 0.0
+			_auto_test_count += 1
+			current_mana = max_mana
+			spell_cooldown_timers[2] = 0.0
+			_cast_lightning_bolt()
+
+	# Clean up expired temporary effects
+	_cleanup_temp_effects(delta)
+
+	# Don't process if dead
+	if is_dead:
+		# Still apply gravity so corpse falls
+		if not is_on_floor():
+			velocity.y -= gravity * delta
+		move_and_slide()
+		# Continue death camera animation
+		_update_death_animation(delta)
+		return
+
 	# Update timers
 	_update_cooldowns(delta)
 
@@ -204,6 +355,9 @@ func _physics_process(delta: float) -> void:
 	if camera:
 		var target_fov := ADS_FOV if is_aiming else DEFAULT_FOV
 		camera.fov = lerpf(camera.fov, target_fov, ADS_ZOOM_SPEED * delta)
+
+	# Handle damage shake (no tweens)
+	_update_damage_shake(delta)
 
 	# Move
 	move_and_slide()
@@ -307,9 +461,13 @@ func _spawn_spell_effect(spell_name: String) -> void:
 	var spawn_position := global_position + Vector3(0, 1.5, 0) + camera_forward * 1.0
 
 	match spell_name:
-		"fireball", "lightning":
-			# Projectile spells
+		"fireball":
+			# Projectile spell
 			_spawn_projectile(spawn_position, camera_forward, spell_name)
+
+		"lightning":
+			# Instant raycast spell with bolt from sky
+			_cast_lightning_bolt()
 
 		"frost_nova":
 			# AOE centered on player - freeze/slow nearby enemies
@@ -354,90 +512,149 @@ func _spawn_projectile(spawn_pos: Vector3, direction: Vector3, spell_name: Strin
 
 
 func _cast_frost_nova() -> void:
-	# AOE damage and slow around player
+	# Simple AOE centered on player - damages nearby enemies
 	var aoe_radius := 8.0
 	var damage := 30.0
+	var player_pos: Vector3 = global_position
 
-	# Find enemies in range
-	var enemies := get_tree().get_nodes_in_group("enemies")
-	for enemy in enemies:
+	# Find and damage enemies in range
+	for enemy in get_tree().get_nodes_in_group("enemies"):
 		if not is_instance_valid(enemy):
 			continue
-		var dist := global_position.distance_to(enemy.global_position)
-		if dist <= aoe_radius:
+		if player_pos.distance_to(enemy.global_position) <= aoe_radius:
 			if enemy.has_method("take_damage"):
-				# AOE hits center mass
 				var hit_pos: Vector3 = enemy.global_position + Vector3(0, 0.9, 0)
 				enemy.take_damage(damage, self, hit_pos)
-			# Could add slow effect here
 
-	# Visual effect
-	_create_aoe_effect(Color(0.4, 0.8, 1.0, 0.8), aoe_radius)
+	# Create simple ground ring effect centered on player
+	_create_ground_ring(Color(0.4, 0.8, 1.0), aoe_radius)
 
 
 func _cast_flame_wave() -> void:
-	# AOE fire damage around player
+	# Simple AOE centered on player - damages nearby enemies with fire
 	var aoe_radius := 6.0
 	var damage := 45.0
+	var player_pos: Vector3 = global_position
 
-	# Find enemies in range
-	var enemies := get_tree().get_nodes_in_group("enemies")
-	for enemy in enemies:
+	# Find and damage enemies in range
+	for enemy in get_tree().get_nodes_in_group("enemies"):
 		if not is_instance_valid(enemy):
 			continue
-		var dist := global_position.distance_to(enemy.global_position)
-		if dist <= aoe_radius:
+		if player_pos.distance_to(enemy.global_position) <= aoe_radius:
 			if enemy.has_method("take_damage"):
-				# AOE hits center mass
 				var hit_pos: Vector3 = enemy.global_position + Vector3(0, 0.9, 0)
 				enemy.take_damage(damage, self, hit_pos)
 
-	# Visual effect
-	_create_aoe_effect(Color(1.0, 0.4, 0.1, 0.8), aoe_radius)
+	# Create simple ground ring effect centered on player
+	_create_ground_ring(Color(1.0, 0.4, 0.1), aoe_radius)
 
 
-func _create_aoe_effect(color: Color, radius: float) -> void:
-	# Create expanding ring effect
+func _cast_lightning_bolt() -> void:
+	# Lightning bolt - strikes where aiming, AOE damage, always headshots
+	var damage := 35.0
+	var aoe_radius := 4.0
+
+	# Raycast to find strike point
+	var space_state = get_world_3d().direct_space_state
+	var from: Vector3 = camera.global_position
+	var forward: Vector3 = -camera.global_transform.basis.z
+	var to: Vector3 = from + forward * 100.0
+
+	var query = PhysicsRayQueryParameters3D.create(from, to)
+	query.exclude = [self]
+
+	var result = space_state.intersect_ray(query)
+
+	var strike_pos: Vector3
+	if result:
+		strike_pos = result.position
+	else:
+		strike_pos = to
+
+	# Damage enemies in AOE (simple distance check)
+	var enemies = get_tree().get_nodes_in_group("enemy")
+	for enemy in enemies:
+		if not is_instance_valid(enemy):
+			continue
+		var dist: float = enemy.global_position.distance_to(strike_pos)
+		if dist <= aoe_radius and enemy.has_method("take_damage"):
+			var head_pos: Vector3 = enemy.global_position + Vector3(0, 1.8, 0)
+			enemy.take_damage(damage, self, head_pos)
+
+	# Spawn visual effect
+	_create_lightning_visual(strike_pos)
+
+
+func _cleanup_temp_effects(delta: float) -> void:
+	var i := 0
+	while i < _temp_effects.size():
+		var effect_data := _temp_effects[i]
+		effect_data.time_left -= delta
+		if effect_data.time_left <= 0:
+			if is_instance_valid(effect_data.node):
+				effect_data.node.queue_free()
+			_temp_effects.remove_at(i)
+		else:
+			i += 1
+
+
+func _create_lightning_visual(strike_pos: Vector3) -> void:
+	# Use preloaded material to avoid runtime emission crash
+	var bolt := MeshInstance3D.new()
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = 0.2
+	cyl.bottom_radius = 0.2
+	cyl.height = 25.0
+	bolt.mesh = cyl
+	bolt.material_override = LightningMaterial
+
+	add_child(bolt)
+	bolt.global_position = strike_pos + Vector3(0, 12.5, 0)
+
+	_temp_effects.append({"node": bolt, "time_left": 0.15})
+
+
+func _create_ground_ring(color: Color, radius: float) -> void:
+	# Simple flat disc/ring on ground centered at player position
 	var effect := MeshInstance3D.new()
-	var torus := TorusMesh.new()
-	torus.inner_radius = radius - 0.3
-	torus.outer_radius = radius
-	torus.rings = 32
-	torus.ring_segments = 16
-	effect.mesh = torus
+	effect.name = "GroundRing"
+
+	# Use a flat cylinder (disc) for ground effect
+	var disc := CylinderMesh.new()
+	disc.top_radius = radius
+	disc.bottom_radius = radius
+	disc.height = 0.1  # Very thin - essentially flat
+	effect.mesh = disc
 
 	var material := StandardMaterial3D.new()
-	material.albedo_color = color
+	material.albedo_color = Color(color.r, color.g, color.b, 0.6)
 	material.emission_enabled = true
 	material.emission = color
 	material.emission_energy_multiplier = 3.0
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	effect.material_override = material
 
 	get_tree().current_scene.add_child(effect)
-	effect.global_position = global_position + Vector3(0, 0.1, 0)
-	effect.rotation.x = PI / 2.0
+	# Position at player's feet level
+	effect.global_position = Vector3(global_position.x, global_position.y + 0.1, global_position.z)
 
-	# Animate expansion and fade
-	var tween := create_tween()
-	tween.tween_property(effect, "scale", Vector3.ONE * 1.5, 0.3)
-	tween.parallel().tween_property(material, "albedo_color:a", 0.0, 0.4)
-	tween.tween_callback(effect.queue_free)
-
-	# Add light flash
+	# Add glow light at ground level (not from above)
 	var light := OmniLight3D.new()
 	light.light_color = color
 	light.light_energy = 4.0
 	light.omni_range = radius * 1.5
+	light.position = Vector3.ZERO  # At effect center
 	effect.add_child(light)
 
-	var light_tween := create_tween()
-	light_tween.tween_property(light, "light_energy", 0.0, 0.3)
+	# Track for manual cleanup - no tweens, no timers
+	_temp_effects.append({"node": effect, "time_left": 0.5})
 
 
 func _create_heal_effect() -> void:
 	# Green healing particles around player
 	var effect := MeshInstance3D.new()
+	effect.name = "HealEffect"
 	var sphere := SphereMesh.new()
 	sphere.radius = 1.0
 	sphere.height = 2.0
@@ -454,15 +671,15 @@ func _create_heal_effect() -> void:
 	get_tree().current_scene.add_child(effect)
 	effect.global_position = global_position + Vector3(0, 1.0, 0)
 
-	# Animate rise and fade
-	var tween := create_tween()
-	tween.tween_property(effect, "global_position:y", global_position.y + 2.5, 0.5)
-	tween.parallel().tween_property(material, "albedo_color:a", 0.0, 0.6)
-	tween.tween_callback(effect.queue_free)
+	# Track for manual cleanup - no tweens
+	_temp_effects.append({"node": effect, "time_left": 0.6})
 
 
 ## Take damage from zombie
 func take_damage(amount: float, _attacker: Node = null) -> void:
+	if is_dead:
+		return
+
 	current_health -= amount
 	current_health = max(current_health, 0)
 
@@ -484,16 +701,34 @@ func take_damage(amount: float, _attacker: Node = null) -> void:
 		_die()
 
 
+var _damage_shake_timer: float = 0.0
+var _damage_shake_phase: int = 0
+var _original_cam_z_rotation: float = 0.0
+
+func _update_damage_shake(delta: float) -> void:
+	if _damage_shake_timer <= 0:
+		return
+
+	if not camera_mount:
+		_damage_shake_timer = 0.0
+		return
+
+	_damage_shake_timer -= delta
+
+	# Simple shake oscillation
+	var shake_amount := sin(_damage_shake_timer * 60.0) * 0.04 * (_damage_shake_timer / 0.1)
+	camera_mount.rotation.z = _original_cam_z_rotation + shake_amount
+
+	if _damage_shake_timer <= 0:
+		camera_mount.rotation.z = _original_cam_z_rotation
+
 func _apply_damage_shake() -> void:
 	if not camera_mount:
 		return
 
-	# Quick camera shake
-	var original_rotation = camera_mount.rotation
-	var shake_tween = create_tween()
-	shake_tween.tween_property(camera_mount, "rotation:z", original_rotation.z + 0.05, 0.03)
-	shake_tween.tween_property(camera_mount, "rotation:z", original_rotation.z - 0.03, 0.03)
-	shake_tween.tween_property(camera_mount, "rotation:z", original_rotation.z, 0.04)
+	# Start manual shake (no tweens)
+	_original_cam_z_rotation = camera_mount.rotation.z
+	_damage_shake_timer = 0.1
 
 
 ## Heal player
@@ -502,13 +737,57 @@ func heal(amount: float) -> void:
 
 
 ## Player death
+var _death_anim_timer: float = 0.0
+var _death_cam_start_x: float = 0.0
+var _death_cam_start_y: float = 0.0
+
 func _die() -> void:
+	if is_dead:
+		return
+	is_dead = true
 	print("Player died!")
+
+	# Disable controls
+	set_process_input(false)
+
+	# Release mouse so player can interact with death screen
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+	# Disable collision so zombies stop attacking
+	collision_layer = 0
+	collision_mask = 0
+
+	# Start death animation (no tweens)
+	if camera_mount:
+		_death_cam_start_x = camera_mount.rotation.x
+		_death_cam_start_y = camera_mount.position.y
+		_death_anim_timer = 0.5
+
+	# Notify GameManager
+	if GameManager and GameManager.has_method("on_player_died"):
+		GameManager.on_player_died()
+
+
+func _update_death_animation(delta: float) -> void:
+	if _death_anim_timer <= 0:
+		return
+
+	if not camera_mount:
+		_death_anim_timer = 0.0
+		return
+
+	_death_anim_timer -= delta
+	var progress := 1.0 - (_death_anim_timer / 0.5)
+	progress = clampf(progress, 0.0, 1.0)
+
+	# Animate camera falling
+	camera_mount.rotation.x = lerpf(_death_cam_start_x, deg_to_rad(-80), progress)
+	camera_mount.position.y = lerpf(_death_cam_start_y, 0.3, progress)
 
 
 ## Check if player can be targeted
 func is_valid_target() -> bool:
-	return current_health > 0
+	return not is_dead and current_health > 0
 
 
 ## Get current health percentage

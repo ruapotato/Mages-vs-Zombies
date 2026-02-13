@@ -19,6 +19,7 @@ var velocity: Vector3 = Vector3.ZERO
 var current_health: float
 var caster: Node3D = null
 var time_alive: float = 0.0
+var is_timing_out: bool = false  # Prevent multiple timeout tweens
 
 # Visual components
 var sprite: Sprite3D
@@ -120,6 +121,12 @@ func _find_target() -> void:
 func _physics_process(delta: float) -> void:
 	time_alive += delta
 
+	# Process hit flash (no tweens)
+	if _hit_flash_timer > 0:
+		_hit_flash_timer -= delta
+		if _hit_flash_timer <= 0 and sprite:
+			sprite.modulate = Color(1.0, 1.0, 1.0)
+
 	# Check timeout
 	if time_alive >= lifetime:
 		_timeout()
@@ -197,59 +204,36 @@ func _on_area_entered(area: Area3D) -> void:
 		take_damage(spell_damage)
 
 
-func take_damage(amount: float, attacker: Node3D = null) -> void:
+var _hit_flash_timer: float = 0.0
+
+func take_damage(amount: float, _attacker: Node3D = null) -> void:
 	current_health -= amount
 
-	# Flash white
+	# Flash white (no tweens)
 	if sprite:
 		sprite.modulate = Color.WHITE
-		await get_tree().create_timer(0.05).timeout
-		if is_instance_valid(self) and sprite:
-			sprite.modulate = Color(1.0, 1.0, 1.0)
+		_hit_flash_timer = 0.05
 
 	if current_health <= 0:
 		_destroy(false)
 
 
 func _timeout() -> void:
-	# Fade out and die
-	if sprite:
-		var tween := create_tween()
-		tween.tween_property(sprite, "modulate:a", 0.0, 0.3)
-		tween.parallel().tween_property(glow_light, "light_energy", 0.0, 0.3)
-		tween.tween_callback(queue_free)
-	else:
-		queue_free()
+	# Only timeout once
+	if is_timing_out:
+		return
+	is_timing_out = true
 
-
-func _destroy(hit_target: bool) -> void:
-	# Emit signal
-	orb_destroyed.emit(self)
-
-	# Create destruction effect
-	_create_destroy_effect(hit_target)
-
-	# Remove
+	# Just delete immediately (no fade animation)
 	queue_free()
 
 
-func _create_destroy_effect(hit_target: bool) -> void:
-	# Create a brief flash effect
-	var effect := Node3D.new()
-	get_tree().root.add_child(effect)
-	effect.global_position = global_position
+func _destroy(_hit_target: bool) -> void:
+	# Emit signal
+	orb_destroyed.emit(self)
 
-	# Flash light
-	var flash := OmniLight3D.new()
-	flash.light_color = Color(0.7, 0.2, 1.0) if not hit_target else Color(1.0, 0.3, 0.3)
-	flash.light_energy = 3.0
-	flash.omni_range = 4.0
-	effect.add_child(flash)
-
-	# Fade and remove
-	var tween := effect.create_tween()
-	tween.tween_property(flash, "light_energy", 0.0, 0.3)
-	tween.tween_callback(effect.queue_free)
+	# No fancy effects - just remove immediately
+	queue_free()
 
 
 ## Initialize the orb with settings

@@ -221,13 +221,13 @@ func _create_spell_slots(parent: Control) -> void:
 	parent.add_child(spell_container)
 
 	# Create 5 spell slots
-	var spell_names = ["Fireball", "Ice", "Lightning", "Heal", "Shield"]
+	var spell_names = ["Fire", "Frost", "Bolt", "Heal", "Wave"]
 	var spell_colors = [
 		Color(1.0, 0.4, 0.1),  # Fire - orange
-		Color(0.3, 0.7, 1.0),  # Ice - blue
+		Color(0.3, 0.7, 1.0),  # Frost Nova - blue
 		Color(1.0, 1.0, 0.3),  # Lightning - yellow
 		Color(0.3, 1.0, 0.4),  # Heal - green
-		Color(0.6, 0.3, 1.0),  # Shield - purple
+		Color(1.0, 0.5, 0.2),  # Flame Wave - orange-red
 	]
 
 	for i in range(5):
@@ -238,7 +238,7 @@ func _create_spell_slots(parent: Control) -> void:
 
 func _create_spell_slot(key: int, spell_name: String, color: Color) -> Control:
 	var slot = Control.new()
-	slot.custom_minimum_size = Vector2(60, 70)
+	slot.custom_minimum_size = Vector2(60, 85)
 	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	# Background
@@ -263,6 +263,16 @@ func _create_spell_slot(key: int, spell_name: String, color: Color) -> Control:
 	key_label.add_theme_font_size_override("font_size", 14)
 	key_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.8))
 	slot.add_child(key_label)
+
+	# Spell name label
+	var name_label = Label.new()
+	name_label.text = spell_name
+	name_label.position = Vector2(6, 72)
+	name_label.size = Vector2(48, 14)
+	name_label.add_theme_font_size_override("font_size", 10)
+	name_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	slot.add_child(name_label)
 
 	# Cooldown overlay
 	var cooldown = ColorRect.new()

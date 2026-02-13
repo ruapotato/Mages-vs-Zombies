@@ -12,6 +12,9 @@ extends Control
 const DEFAULT_PORT := 7777
 
 
+## AUTO-TEST: Disabled
+var _auto_start: bool = false
+
 func _ready() -> void:
 	# Connect buttons
 	host_button.pressed.connect(_on_host_pressed)
@@ -36,6 +39,11 @@ func _ready() -> void:
 
 	# Show mouse
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+	# AUTO-TEST: Automatically start single player game
+	if _auto_start:
+		print("[AUTO-TEST] Auto-starting single player game...")
+		call_deferred("_on_single_player_pressed")
 
 
 func _on_host_pressed() -> void:

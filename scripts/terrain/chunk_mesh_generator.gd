@@ -16,20 +16,23 @@ var edge_table: PackedInt32Array
 # Triangle table: which triangles to create for each configuration
 var tri_table: Array  # Array of PackedInt32Array
 
-# Pre-computed edge vertices for interpolation
-const EDGE_VERTICES: Array = [
-	[0, 1], [1, 2], [2, 3], [3, 0],  # Bottom edges
-	[4, 5], [5, 6], [6, 7], [7, 4],  # Top edges
-	[0, 4], [1, 5], [2, 6], [3, 7]   # Vertical edges
-]
+# Pre-computed edge vertices for interpolation (thread-safe packed arrays)
+# Each edge connects two corner vertices
+var edge_v1: PackedInt32Array
+var edge_v2: PackedInt32Array
 
-# Cube corner offsets (local coordinates)
-const CORNER_OFFSETS: Array = [
-	Vector3(0, 0, 0), Vector3(1, 0, 0), Vector3(1, 0, 1), Vector3(0, 0, 1),  # Bottom
-	Vector3(0, 1, 0), Vector3(1, 1, 0), Vector3(1, 1, 1), Vector3(0, 1, 1)   # Top
-]
+# Cube corner offsets (thread-safe flat arrays - x,y,z per corner)
+var corner_x: PackedFloat32Array
+var corner_y: PackedFloat32Array
+var corner_z: PackedFloat32Array
 
 func _init() -> void:
+	# Initialize thread-safe lookup arrays (each instance gets own copy)
+	edge_v1 = PackedInt32Array([0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3])
+	edge_v2 = PackedInt32Array([1, 2, 3, 0, 5, 6, 7, 4, 4, 5, 6, 7])
+	corner_x = PackedFloat32Array([0, 1, 1, 0, 0, 1, 1, 0])
+	corner_y = PackedFloat32Array([0, 0, 0, 0, 1, 1, 1, 1])
+	corner_z = PackedFloat32Array([0, 0, 1, 1, 0, 0, 1, 1])
 	_init_marching_cubes_tables()
 
 ## Initialize the marching cubes lookup tables
@@ -435,10 +438,9 @@ func _process_cube(chunk, neighbors: Dictionary,
 	var all_outside: bool = true
 
 	for i in 8:
-		var offset: Vector3 = CORNER_OFFSETS[i]
-		var cx: int = x + int(offset.x)
-		var cy: int = y_local + int(offset.y)
-		var cz: int = z + int(offset.z)
+		var cx: int = x + int(corner_x[i])
+		var cy: int = y_local + int(corner_y[i])
+		var cz: int = z + int(corner_z[i])
 		var density: float = _get_density(chunk, neighbors, cx, cy, cz)
 		corner_densities[i] = density
 
@@ -470,10 +472,14 @@ func _process_cube(chunk, neighbors: Dictionary,
 
 	for i in 12:
 		if edge_table[cube_index] & (1 << i):
-			var v1_idx: int = EDGE_VERTICES[i][0]
-			var v2_idx: int = EDGE_VERTICES[i][1]
-			var v1: Vector3 = CORNER_OFFSETS[v1_idx]
-			var v2: Vector3 = CORNER_OFFSETS[v2_idx]
+			var v1_idx: int = edge_v1[i]
+			var v2_idx: int = edge_v2[i]
+			var v1x: float = corner_x[v1_idx]
+			var v1y: float = corner_y[v1_idx]
+			var v1z: float = corner_z[v1_idx]
+			var v2x: float = corner_x[v2_idx]
+			var v2y: float = corner_y[v2_idx]
+			var v2z: float = corner_z[v2_idx]
 			var d1: float = corner_densities[v1_idx]
 			var d2: float = corner_densities[v2_idx]
 
@@ -482,9 +488,9 @@ func _process_cube(chunk, neighbors: Dictionary,
 			t = clamp(t, 0.0, 1.0)
 
 			var world_pos := Vector3(
-				chunk_origin.x + x + v1.x + t * (v2.x - v1.x),
-				world_y + v1.y + t * (v2.y - v1.y),
-				chunk_origin.z + z + v1.z + t * (v2.z - v1.z)
+				chunk_origin.x + x + v1x + t * (v2x - v1x),
+				world_y + v1y + t * (v2y - v1y),
+				chunk_origin.z + z + v1z + t * (v2z - v1z)
 			)
 			edge_vertices[i] = world_pos
 
@@ -550,10 +556,9 @@ func _process_cube_lod(chunk, neighbors: Dictionary,
 	var all_outside: bool = true
 
 	for i in 8:
-		var offset: Vector3 = CORNER_OFFSETS[i]
-		var cx: int = x + int(offset.x) * step
-		var cy: int = y_local + int(offset.y) * step
-		var cz: int = z + int(offset.z) * step
+		var cx: int = x + int(corner_x[i]) * step
+		var cy: int = y_local + int(corner_y[i]) * step
+		var cz: int = z + int(corner_z[i]) * step
 		var density: float = _get_density(chunk, neighbors, cx, cy, cz)
 		corner_densities[i] = density
 
@@ -580,10 +585,14 @@ func _process_cube_lod(chunk, neighbors: Dictionary,
 
 	for i in 12:
 		if edge_table[cube_index] & (1 << i):
-			var v1_idx: int = EDGE_VERTICES[i][0]
-			var v2_idx: int = EDGE_VERTICES[i][1]
-			var v1: Vector3 = CORNER_OFFSETS[v1_idx] * step
-			var v2: Vector3 = CORNER_OFFSETS[v2_idx] * step
+			var v1_idx: int = edge_v1[i]
+			var v2_idx: int = edge_v2[i]
+			var v1x: float = corner_x[v1_idx] * step
+			var v1y: float = corner_y[v1_idx] * step
+			var v1z: float = corner_z[v1_idx] * step
+			var v2x: float = corner_x[v2_idx] * step
+			var v2y: float = corner_y[v2_idx] * step
+			var v2z: float = corner_z[v2_idx] * step
 			var d1: float = corner_densities[v1_idx]
 			var d2: float = corner_densities[v2_idx]
 
@@ -591,22 +600,22 @@ func _process_cube_lod(chunk, neighbors: Dictionary,
 			t = clamp(t, 0.0, 1.0)
 
 			var world_pos := Vector3(
-				chunk_origin.x + x + v1.x + t * (v2.x - v1.x),
-				world_y + v1.y + t * (v2.y - v1.y),
-				chunk_origin.z + z + v1.z + t * (v2.z - v1.z)
+				chunk_origin.x + x + v1x + t * (v2x - v1x),
+				world_y + v1y + t * (v2y - v1y),
+				chunk_origin.z + z + v1z + t * (v2z - v1z)
 			)
 			edge_vertices[i] = world_pos
 
 	var tris: PackedInt32Array = tri_table[cube_index]
 
-	var i: int = 0
-	while i < tris.size() and tris[i] != -1:
-		var edge_idx0: int = tris[i]
-		var edge_idx1: int = tris[i + 1]
-		var edge_idx2: int = tris[i + 2]
+	var ii: int = 0
+	while ii < tris.size() and tris[ii] != -1:
+		var edge_idx0: int = tris[ii]
+		var edge_idx1: int = tris[ii + 1]
+		var edge_idx2: int = tris[ii + 2]
 
 		if edge_vertices[edge_idx0] == null or edge_vertices[edge_idx1] == null or edge_vertices[edge_idx2] == null:
-			i += 3
+			ii += 3
 			continue
 
 		var v0: Vector3 = edge_vertices[edge_idx0]
@@ -633,7 +642,7 @@ func _process_cube_lod(chunk, neighbors: Dictionary,
 		indices.append(vi + 1)
 		indices.append(vi + 2)
 
-		i += 3
+		ii += 3
 
 ## Get density at a position, checking neighbor chunks if needed
 func _get_density(chunk, neighbors: Dictionary, x: int, y_local: int, z: int) -> float:

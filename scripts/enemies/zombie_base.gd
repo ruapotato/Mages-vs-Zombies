@@ -48,16 +48,19 @@ var can_attack: bool = true
 var target_player: Node3D = null
 var players_in_attack_range: Array[Node3D] = []
 
-# Headshot tracking - based on hit height on the mesh
+# Headshot tracking - matching ZvH logic
 var last_hit_was_headshot: bool = false
 var last_hit_position: Vector3 = Vector3.ZERO
-const HEADSHOT_HEIGHT_RATIO: float = 0.7  # Top 30% of zombie height is "head"
+@export var head_position_y: float = 1.5  # Y height where head is (from base)
+const HEAD_THRESHOLD: float = 0.3  # Hits within this distance below head_position_y count as headshot
 
 # Animation state (matching ZvH)
 var anim_time: float = 0.0
 var base_sprite_y: float = 0.9  # Base Y position for sprite
 var is_attacking_anim: bool = false
 var attack_anim_time: float = 0.0
+var death_anim_started: bool = false  # Prevent multiple death tweens
+var _hit_flash_timer: float = 0.0  # For damage flash without tweens
 
 # Health bar (matching ZvH)
 var health_bar_sprite: Sprite3D = null
@@ -132,13 +135,9 @@ func _ready() -> void:
 	# Create health bar (hidden until damaged)
 	_create_health_bar()
 
-	# Start spawning sequence
+	# Start spawning sequence - use manual timer (no tweens)
 	current_state = State.SPAWNING
-	await get_tree().create_timer(0.3).timeout
-	if is_instance_valid(self):
-		current_state = State.CHASING
-		# Find player immediately
-		_find_target_player()
+	_spawn_timer = 0.3
 
 
 func _generate_swipe_texture() -> ImageTexture:
@@ -228,10 +227,21 @@ func _physics_process(delta: float) -> void:
 	# Update time scaling
 	_update_time_scaling()
 
+	# Process hit flash timer (no tweens)
+	if _hit_flash_timer > 0:
+		_hit_flash_timer -= delta
+		if _hit_flash_timer <= 0 and sprite:
+			sprite.modulate = Color(0.8, 0.5, 0.5) if is_night_time else Color(1.0, 1.0, 1.0)
+
 	# State machine
 	match current_state:
 		State.SPAWNING:
-			pass  # Handled in _ready
+			# Manual spawn timer (no tweens)
+			if _spawn_timer > 0:
+				_spawn_timer -= delta
+				if _spawn_timer <= 0:
+					current_state = State.CHASING
+					_find_target_player()
 		State.IDLE:
 			_process_idle(delta)
 		State.CHASING:
@@ -349,18 +359,34 @@ func _perform_attack() -> void:
 			hit_player.emit(self, current_damage)
 
 
+var _death_timer: float = 0.0
+var _death_duration: float = 0.3
+var _spawn_timer: float = 0.0  # For spawn delay without tweens
+
 func _process_dying(delta: float) -> void:
 	velocity = Vector3.ZERO
 
-	# Death animation - fall flat
+	# Start death animation
+	if not death_anim_started:
+		death_anim_started = true
+		_death_timer = 0.0
+
+	# Animate death manually (no tweens)
+	_death_timer += delta
+	var progress := clampf(_death_timer / _death_duration, 0.0, 1.0)
+
 	if sprite:
-		var tween = create_tween()
-		tween.tween_property(sprite, "rotation:x", -PI/2, 0.3)
-		tween.parallel().tween_property(sprite, "position:y", 0.1, 0.3)
-		tween.parallel().tween_property(sprite, "modulate:a", 0.5, 0.3)
-		tween.tween_callback(_finish_death)
-		current_state = State.DEAD  # Prevent re-triggering
-	else:
+		sprite.rotation.x = lerpf(0.0, -PI/2, progress)
+		sprite.position.y = lerpf(base_sprite_y, 0.1, progress)
+		sprite.modulate.a = lerpf(1.0, 0.5, progress)
+
+	# Finish when done
+	if _death_timer >= _death_duration:
+		_finish_death()
+		return
+
+	# Fallback if no sprite
+	if not sprite:
 		_finish_death()
 
 
@@ -454,12 +480,13 @@ func take_damage(amount: float, attacker: Node3D = null, hit_position: Vector3 =
 	current_health -= amount
 	current_health = max(0, current_health)
 
-	# Determine if headshot based on hit height
+	# Determine if headshot based on hit height - matching ZvH logic exactly
 	last_hit_position = hit_position if hit_position != Vector3.ZERO else global_position + Vector3(0, 1.0, 0)
-	var zombie_base_y = global_position.y
-	var zombie_height = 1.8  # Approximate zombie height
-	var hit_height_ratio = (last_hit_position.y - zombie_base_y) / zombie_height
-	last_hit_was_headshot = hit_height_ratio >= HEADSHOT_HEIGHT_RATIO
+	var hit_height: float = last_hit_position.y - global_position.y
+	# Headshot if hit is at or above (head_position_y - HEAD_THRESHOLD)
+	var this_hit_is_headshot: bool = hit_height >= (head_position_y - HEAD_THRESHOLD)
+	if this_hit_is_headshot:
+		last_hit_was_headshot = true
 
 	# Update health bar
 	_update_health_bar()
@@ -467,9 +494,7 @@ func take_damage(amount: float, attacker: Node3D = null, hit_position: Vector3 =
 	# Flash white on hit
 	if sprite:
 		sprite.modulate = Color.WHITE
-		await get_tree().create_timer(0.05).timeout
-		if is_instance_valid(self) and sprite:
-			sprite.modulate = Color(0.8, 0.5, 0.5) if is_night_time else Color(1.0, 1.0, 1.0)
+		_hit_flash_timer = 0.05
 
 	if current_health <= 0:
 		die()

@@ -138,6 +138,14 @@ func _create_visuals() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# Handle explosion cleanup (no tweens)
+	if _explosion_active:
+		_explosion_timer -= delta
+		_update_explosion_animation(delta)
+		if _explosion_timer <= 0:
+			queue_free()
+		return
+
 	if has_hit:
 		return
 
@@ -207,6 +215,9 @@ func _on_area_entered(area: Area3D) -> void:
 			_hit(parent)
 
 
+var _explosion_timer: float = 0.0
+var _explosion_active: bool = false
+
 func _hit(hit_target: Node = null) -> void:
 	has_hit = true
 	velocity = Vector3.ZERO
@@ -218,16 +229,16 @@ func _hit(hit_target: Node = null) -> void:
 	# AOE damage
 	_deal_explosion_damage()
 
-	# Explosion effect
+	# Explosion effect - start manual animation
 	_spawn_explosion()
 
 	# Disable collision
 	set_deferred("monitoring", false)
 	set_deferred("monitorable", false)
 
-	# Cleanup after explosion animation
-	await get_tree().create_timer(0.5).timeout
-	queue_free()
+	# Start cleanup timer (no tweens)
+	_explosion_active = true
+	_explosion_timer = 0.5
 
 
 func _deal_explosion_damage() -> void:
@@ -253,6 +264,8 @@ func _deal_explosion_damage() -> void:
 			collider.take_damage(aoe_damage, owner_node, hit_pos)
 
 
+var _explosion_start_light_energy: float = 8.0
+
 func _spawn_explosion() -> void:
 	# Stop normal particles
 	if particles:
@@ -260,18 +273,28 @@ func _spawn_explosion() -> void:
 	if trail_particles:
 		trail_particles.emitting = false
 
-	# Scale up mesh quickly then fade
-	if mesh_instance:
-		var tween = create_tween()
-		tween.tween_property(mesh_instance, "scale", Vector3.ONE * 3.0, 0.1)
-		tween.parallel().tween_property(mesh_instance, "transparency", 1.0, 0.3)
-
-	# Bright flash
+	# Set initial explosion state (animation handled in _update_explosion_animation)
 	if light:
-		light.light_energy = 8.0
-		var tween = create_tween()
-		tween.tween_property(light, "light_energy", 0.0, 0.3)
-		tween.tween_property(light, "omni_range", 8.0, 0.1)
+		light.light_energy = _explosion_start_light_energy
+
+
+func _update_explosion_animation(delta: float) -> void:
+	# Manual animation instead of tweens
+	var total_duration: float = 0.5
+	var progress: float = 1.0 - (_explosion_timer / total_duration)
+	progress = clampf(progress, 0.0, 1.0)
+
+	# Scale up mesh
+	if mesh_instance:
+		mesh_instance.scale = Vector3.ONE * lerpf(1.0, 3.0, minf(progress * 5.0, 1.0))
+		# Fade using material if available
+		var mat = mesh_instance.material_override
+		if mat and mat is StandardMaterial3D:
+			mat.albedo_color.a = lerpf(1.0, 0.0, progress)
+
+	# Fade light
+	if light:
+		light.light_energy = lerpf(_explosion_start_light_energy, 0.0, progress)
 
 	# Create explosion particles
 	var explosion = GPUParticles3D.new()

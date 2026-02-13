@@ -69,6 +69,27 @@ func _process(delta: float) -> void:
 		if player_mana < player_max_mana:
 			player_mana = min(player_mana + mana_regen_rate * delta, player_max_mana)
 
+	# Animate point popups manually (no tweens)
+	_update_point_popups(delta)
+
+
+func _update_point_popups(delta: float) -> void:
+	var i := 0
+	while i < _point_popups.size():
+		var popup: Dictionary = _point_popups[i]
+		popup.time += delta
+		var progress: float = popup.time / popup.duration
+
+		if progress >= 1.0:
+			if is_instance_valid(popup.node):
+				popup.node.queue_free()
+			_point_popups.remove_at(i)
+		else:
+			if is_instance_valid(popup.node):
+				popup.node.position.y = popup.start_y + progress * 2.0
+				popup.node.modulate.a = 1.0 - progress
+			i += 1
+
 func start_game() -> void:
 	current_state = GameState.PLAYING
 	current_day = 1
@@ -181,27 +202,29 @@ func on_zombie_killed(zombie_type: String, position: Vector3, was_headshot: bool
 	zombie_killed.emit(zombie_type, position, points, was_headshot)
 
 
+## Track point popups for manual cleanup (no tweens)
+var _point_popups: Array[Dictionary] = []
+
 func _spawn_point_popup(position: Vector3, points: int, is_headshot: bool) -> void:
-	# Create a 3D label to show points
 	var label := Label3D.new()
 	label.text = "+%d" % points
 	label.font_size = 48 if is_headshot else 32
 	label.modulate = Color.YELLOW if is_headshot else Color.WHITE
 	label.outline_size = 8
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	label.no_depth_test = true  # Always visible
+	label.no_depth_test = true
 
 	var game_scene: Node = get_tree().current_scene
 	if game_scene:
 		game_scene.add_child(label)
 		label.global_position = position
 
-		# Animate: float up and fade out
-		var tween := create_tween()
-		tween.set_parallel(true)
-		tween.tween_property(label, "position:y", position.y + 2.0, 1.0)
-		tween.tween_property(label, "modulate:a", 0.0, 1.0)
-		tween.chain().tween_callback(label.queue_free)
+		_point_popups.append({
+			"node": label,
+			"start_y": position.y,
+			"time": 0.0,
+			"duration": 1.0
+		})
 
 func damage_player(amount: float) -> void:
 	player_health -= amount

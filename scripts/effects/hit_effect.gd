@@ -11,13 +11,40 @@ var mesh: MeshInstance3D
 var light: OmniLight3D
 var particles: GPUParticles3D
 
+# Manual animation state (no tweens/await)
+var _anim_timer: float = 0.0
+var _lifetime: float = 0.5
+var _start_light_energy: float = 2.0
+
 
 func _ready() -> void:
 	_create_effect()
+	_anim_timer = 0.0
 
-	# Auto-destroy after effect completes
-	await get_tree().create_timer(0.5).timeout
-	queue_free()
+
+func _process(delta: float) -> void:
+	_anim_timer += delta
+
+	# Animate manually (no tweens)
+	var scale_up_end := 0.1
+	var fade_end := 0.3
+
+	if _anim_timer < scale_up_end:
+		# Scale up mesh
+		var progress := _anim_timer / scale_up_end
+		if mesh:
+			mesh.scale = Vector3.ONE * lerpf(1.0, 1.5, progress)
+	elif _anim_timer < fade_end:
+		# Fade light and scale down mesh
+		var progress := (_anim_timer - scale_up_end) / (fade_end - scale_up_end)
+		if light:
+			light.light_energy = lerpf(_start_light_energy, 0.0, progress)
+		if mesh:
+			mesh.scale = Vector3.ONE * lerpf(1.5, 0.1, progress)
+
+	# Destroy when done
+	if _anim_timer >= _lifetime:
+		queue_free()
 
 
 func _create_effect() -> void:
@@ -80,11 +107,8 @@ func _create_effect() -> void:
 	particles.draw_pass_1 = particle_mesh
 	add_child(particles)
 
-	# Animate
-	var tween = create_tween()
-	tween.tween_property(mesh, "scale", Vector3.ONE * 1.5, 0.1)
-	tween.parallel().tween_property(light, "light_energy", 0.0, 0.2)
-	tween.tween_property(mesh, "scale", Vector3.ONE * 0.1, 0.2)
+	# Store light energy for animation (no tweens)
+	_start_light_energy = light.light_energy
 
 
 ## Static helper to spawn a hit effect at a position
