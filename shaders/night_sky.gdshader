@@ -220,79 +220,68 @@ void sky() {
 	vec3 dir = EYEDIR;
 	vec3 norm_sun_dir = normalize(sun_direction);
 
-	// Sky gradient based on height
-	float horizon_blend = smoothstep(-0.1, 0.3, dir.y);
-	vec3 sky = mix(sky_horizon_color, sky_top_color, horizon_blend);
+	// Simple sky gradient - this MUST show color if shader is working
+	float horizon_blend = smoothstep(-0.1, 0.4, dir.y);
+	vec3 sky_col = mix(sky_horizon_color, sky_top_color, horizon_blend);
 
 	// Ground (below horizon)
 	if (dir.y < 0.0) {
 		float ground_blend = smoothstep(0.0, -0.3, dir.y);
-		sky = mix(sky_horizon_color, ground_color, ground_blend);
+		sky_col = mix(sky_horizon_color, ground_color, ground_blend);
 	}
 
-	// Sun - using uniform sun_direction (set by DayNightCycle GDScript)
+	// Sun
 	float sun_dist = distance(dir, norm_sun_dir);
 	float sun_disc = smoothstep(sun_size, sun_size * 0.5, sun_dist);
 	float sun_glow = smoothstep(sun_size * 4.0, sun_size, sun_dist) * 0.3;
 
-	// Only show sun above horizon
 	if (norm_sun_dir.y > -0.1) {
-		sky += sun_color * (sun_disc + sun_glow) * sun_energy;
+		sky_col += sun_color * (sun_disc + sun_glow) * sun_energy;
 	}
 
-	// Stars (only visible at night, above horizon)
+	// Stars (only at night, above horizon)
 	if (star_brightness > 0.01 && dir.y > 0.0) {
 		float star_field = stars(dir, star_density, TIME * star_twinkle_speed);
 
-		// Star color variation
 		vec3 star_col = vec3(1.0, 1.0, 1.0);
 		float temp_var = hash(dir.xz * 100.0);
 		if (temp_var > 0.7) {
-			star_col = vec3(0.8, 0.9, 1.0); // Blue-ish
+			star_col = vec3(0.8, 0.9, 1.0);
 		} else if (temp_var < 0.3) {
-			star_col = vec3(1.0, 0.95, 0.8); // Yellow-ish
+			star_col = vec3(1.0, 0.95, 0.8);
 		}
 
-		// Add milky way
 		float milky = milky_way(dir);
 		vec3 milky_color = vec3(0.6, 0.65, 0.8);
 
-		// Clouds block stars
 		float star_cloud_block = 1.0 - cloud_coverage * 0.9;
-
-		// Combine stars and milky way
-		sky += (star_col * star_field + milky_color * milky) * star_brightness * star_cloud_block;
+		sky_col += (star_col * star_field + milky_color * milky) * star_brightness * star_cloud_block;
 	}
 
-	// Moon (visible at night, above horizon)
+	// Moon (at night, above horizon)
 	vec3 n_moon_dir = normalize(moon_direction);
 	if (star_brightness > 0.01 && n_moon_dir.y > -0.1 && dir.y > 0.0) {
 		vec3 moon_col = moon(dir, moon_direction, moon_phase, moon_size);
-		// Clouds partially block moon
 		float moon_cloud_block = 1.0 - cloud_coverage * 0.7;
-		sky += moon_col * moon_cloud_block * star_brightness;
+		sky_col += moon_col * moon_cloud_block * star_brightness;
 	}
 
-	// Clouds (only above horizon)
+	// Clouds (above horizon)
 	if (cloud_coverage > 0.01 && dir.y > 0.0) {
 		float cloud_value = clouds(dir);
 
-		// Cloud color based on time of day
 		vec3 cloud_lit_color = vec3(1.0, 1.0, 1.0);
 		vec3 cloud_dark_color = vec3(0.4, 0.42, 0.45);
 		vec3 cloud_base_color = mix(cloud_lit_color, cloud_dark_color, cloud_darkness);
 
-		// Clouds lit by sun
 		float sun_illumination = max(0.0, dot(dir, norm_sun_dir));
 		vec3 cloud_col = cloud_base_color * (0.7 + sun_illumination * 0.3);
 
-		// At night, clouds are darker
 		float night_factor = 1.0 - clamp(sun_energy, 0.0, 1.0);
 		cloud_col = mix(cloud_col, vec3(0.15, 0.17, 0.25), night_factor * 0.7);
 
-		// Blend clouds over sky
-		sky = mix(sky, cloud_col, cloud_value * 0.9);
+		sky_col = mix(sky_col, cloud_col, cloud_value * 0.9);
 	}
 
-	COLOR = sky;
+	COLOR = sky_col;
 }
