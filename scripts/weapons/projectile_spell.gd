@@ -2,8 +2,12 @@ extends SpellBase
 class_name ProjectileSpell
 ## Projectile-based spells like Fireball, Ice Shard, Magic Missile
 
-# Projectile scene that will be instantiated
-const PROJECTILE_BASE_SCENE = preload("res://scenes/spells/projectile_base.tscn")
+# Projectile scene that will be instantiated (loaded dynamically if exists)
+var PROJECTILE_BASE_SCENE: PackedScene = null
+
+func _init() -> void:
+	if ResourceLoader.exists("res://scenes/spells/projectile_base.tscn"):
+		PROJECTILE_BASE_SCENE = load("res://scenes/spells/projectile_base.tscn")
 
 
 func _execute_spell() -> void:
@@ -92,12 +96,12 @@ func _configure_projectile(projectile: Node3D, direction: Vector3) -> void:
 
 func _apply_missile_spread(base_direction: Vector3, index: int, total: int) -> Vector3:
 	# Spread missiles in a cone pattern
-	var spread_angle := 15.0  # degrees
-	var angle_step := spread_angle / max(total - 1, 1)
-	var start_angle := -spread_angle / 2.0
+	var spread_angle: float = 15.0  # degrees
+	var angle_step: float = spread_angle / max(total - 1, 1)
+	var start_angle: float = -spread_angle / 2.0
 
-	var angle := start_angle + (angle_step * index)
-	var angle_rad := deg_to_rad(angle)
+	var angle: float = start_angle + (angle_step * index)
+	var angle_rad: float = deg_to_rad(angle)
 
 	# Get camera up vector for proper rotation
 	var camera: Camera3D = null

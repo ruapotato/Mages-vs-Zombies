@@ -319,7 +319,7 @@ func _apply_status_effects(enemy: Node) -> void:
 
 	# Knockback
 	if spell_data.knockback_force > 0.0 and enemy.has_method("apply_knockback"):
-		var direction := (enemy.global_position - global_position).normalized()
+		var direction: Vector3 = (enemy.global_position - global_position).normalized()
 		enemy.apply_knockback(direction * spell_data.knockback_force)
 
 

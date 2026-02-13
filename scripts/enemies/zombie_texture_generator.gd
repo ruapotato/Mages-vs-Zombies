@@ -1,5 +1,5 @@
 extends Node
-class_name ZombieTextureGenerator
+## Local zombie texture generator - use ZombieTextureGenerator autoload instead
 ## Generates procedural pixel art textures for different zombie types
 
 # Cached textures so we don't regenerate every spawn

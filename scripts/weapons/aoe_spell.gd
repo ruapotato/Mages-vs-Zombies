@@ -277,7 +277,7 @@ func _update_flame_wave(delta: float) -> void:
 		if spell_data.knockback_force > 0.0:
 			for enemy in enemies:
 				if enemy.has_method("apply_knockback"):
-					var direction := (enemy.global_position - aoe_center).normalized()
+					var direction: Vector3 = (enemy.global_position - aoe_center).normalized()
 					enemy.apply_knockback(direction * spell_data.knockback_force * delta)
 
 

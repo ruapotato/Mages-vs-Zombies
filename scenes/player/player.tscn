@@ -1,47 +1,46 @@
-[gd_scene load_steps=3 format=3 uid="uid://b8qr3yh4jvn2q"]
+[gd_scene format=3 uid="uid://b8qr3yh4jvn2q"]
 
-[ext_resource type="Script" path="res://scripts/player/player_controller.gd" id="1_1k3q2"]
-[ext_resource type="Script" path="res://scripts/player/first_person_arms.gd" id="2_arms"]
+[ext_resource type="Script" uid="uid://dllgwgl5qdgem" path="res://scripts/player/player_controller.gd" id="1_1k3q2"]
+[ext_resource type="Script" uid="uid://b5ocl7tql5ag1" path="res://scripts/player/first_person_arms.gd" id="2_arms"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.35
 height = 1.8
 
-[node name="Player" type="CharacterBody3D"]
+[node name="Player" type="CharacterBody3D" unique_id=1327564843]
 collision_layer = 2
 collision_mask = 5
 script = ExtResource("1_1k3q2")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=239772029]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
 shape = SubResource("CapsuleShape3D_1")
 
-[node name="CameraMount" type="Node3D" parent="."]
+[node name="CameraMount" type="Node3D" parent="." unique_id=792047337]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
 
-[node name="Camera3D" type="Camera3D" parent="CameraMount"]
-fov = 75.0
+[node name="Camera3D" type="Camera3D" parent="CameraMount" unique_id=763684677]
 far = 500.0
 
-[node name="FirstPersonArms" type="Node3D" parent="CameraMount/Camera3D"]
+[node name="FirstPersonArms" type="Node3D" parent="CameraMount/Camera3D" unique_id=906830487]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
 script = ExtResource("2_arms")
 
-[node name="SpellSpawnPoint" type="Marker3D" parent="CameraMount"]
+[node name="SpellSpawnPoint" type="Marker3D" parent="CameraMount" unique_id=468883045]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1)
 
-[node name="MageSprite" type="Sprite3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, -0.15)
+[node name="MageSprite" type="Sprite3D" parent="." unique_id=696189042]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, 0.04204014)
 visible = false
-billboard = 1
-texture_filter = 0
-alpha_cut = 1
 pixel_size = 0.025
-
-[node name="StaffSprite" type="Sprite3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.25, 1.1, -0.1)
-visible = false
 billboard = 1
-texture_filter = 0
 alpha_cut = 1
+texture_filter = 0
+
+[node name="StaffSprite" type="Sprite3D" parent="." unique_id=99926677]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.25, 1.1, 0.092040144)
+visible = false
 pixel_size = 0.02
+billboard = 1
+alpha_cut = 1
+texture_filter = 0

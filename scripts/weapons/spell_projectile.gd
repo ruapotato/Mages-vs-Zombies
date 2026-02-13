@@ -173,11 +173,11 @@ func find_homing_target() -> void:
 			continue
 
 		# Calculate score based on distance and angle
-		var to_enemy := (enemy.global_position - global_position).normalized()
-		var distance := global_position.distance_to(enemy.global_position)
-		var angle := forward.dot(to_enemy)
+		var to_enemy: Vector3 = (enemy.global_position - global_position).normalized()
+		var distance: float = global_position.distance_to(enemy.global_position)
+		var angle: float = forward.dot(to_enemy)
 
-		var score := angle / (distance * 0.1 + 1.0)
+		var score: float = angle / (distance * 0.1 + 1.0)
 
 		if score > best_score:
 			best_score = score
