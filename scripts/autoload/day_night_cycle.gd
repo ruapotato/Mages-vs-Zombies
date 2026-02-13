@@ -19,7 +19,8 @@ var was_night: bool = false  # Track night state for signal emission
 # References to scene nodes (set in _ready or via export)
 var sun_light: DirectionalLight3D
 var world_environment: WorldEnvironment
-var sky_material: ShaderMaterial
+var sky_material: ShaderMaterial  # Only set if using custom ShaderMaterial sky
+var procedural_sky: ProceduralSkyMaterial  # Only set if using ProceduralSkyMaterial
 
 # Biome-based lighting
 var current_biome: String = "valley"
@@ -132,10 +133,9 @@ func _find_scene_nodes() -> void:
 			sky_material = env.sky.sky_material
 			print("[DayNightCycle] Found sky shader material - setting initial values")
 			_update_lighting()
-		elif env.sky and env.sky.sky_material:
-			# Try to use it anyway
-			sky_material = env.sky.sky_material
-			print("[DayNightCycle] Found sky material (non-ShaderMaterial): %s" % sky_material.get_class())
+		elif env.sky and env.sky.sky_material is ProceduralSkyMaterial:
+			procedural_sky = env.sky.sky_material
+			print("[DayNightCycle] Found ProceduralSkyMaterial - will update colors")
 			_update_lighting()
 
 
@@ -150,7 +150,7 @@ func _find_nodes_of_type(node: Node, type_name: String) -> Array:
 
 func _process(delta: float) -> void:
 	# Find scene nodes if not yet found
-	if not sun_light or not world_environment or not sky_material:
+	if not sun_light or not world_environment or (not sky_material and not procedural_sky):
 		_find_scene_nodes()
 
 	# Advance time
@@ -462,16 +462,22 @@ func _update_sky() -> void:
 		ground = GROUND_NIGHT
 		star_brightness = 1.0
 
-	# Update shader parameters
-	sky_material.set_shader_parameter("sky_top_color", Vector3(sky_top.r, sky_top.g, sky_top.b))
-	sky_material.set_shader_parameter("sky_horizon_color", Vector3(sky_horizon.r, sky_horizon.g, sky_horizon.b))
-	sky_material.set_shader_parameter("ground_color", Vector3(ground.r, ground.g, ground.b))
-	sky_material.set_shader_parameter("star_brightness", star_brightness)
-	sky_material.set_shader_parameter("sun_direction", _cached_sun_direction)
-	sky_material.set_shader_parameter("sun_energy", _cached_sun_energy)
-
-	# Update moon position and phase
-	_update_moon()
+	# Update sky material parameters
+	if sky_material:
+		sky_material.set_shader_parameter("sky_top_color", Vector3(sky_top.r, sky_top.g, sky_top.b))
+		sky_material.set_shader_parameter("sky_horizon_color", Vector3(sky_horizon.r, sky_horizon.g, sky_horizon.b))
+		sky_material.set_shader_parameter("ground_color", Vector3(ground.r, ground.g, ground.b))
+		sky_material.set_shader_parameter("star_brightness", star_brightness)
+		sky_material.set_shader_parameter("sun_direction", _cached_sun_direction)
+		sky_material.set_shader_parameter("sun_energy", _cached_sun_energy)
+		# Update moon position and phase
+		_update_moon()
+	elif procedural_sky:
+		# Update ProceduralSkyMaterial colors
+		procedural_sky.sky_top_color = sky_top
+		procedural_sky.sky_horizon_color = sky_horizon
+		procedural_sky.ground_bottom_color = ground
+		procedural_sky.ground_horizon_color = sky_horizon.lerp(ground, 0.5)
 
 ## Get the current time period
 func get_current_period() -> String:
