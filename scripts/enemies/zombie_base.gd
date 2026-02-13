@@ -54,6 +54,13 @@ var base_sprite_y: float = 0.9  # Base Y position for sprite
 var is_attacking_anim: bool = false
 var attack_anim_time: float = 0.0
 
+# Health bar (matching ZvH)
+var health_bar_sprite: Sprite3D = null
+var health_bar_image: Image = null
+var health_bar_texture: ImageTexture = null
+const HEALTH_BAR_WIDTH := 32
+const HEALTH_BAR_HEIGHT := 4
+
 # LOD
 var lod_level: int = 0
 var lod_distance: float = 0.0
@@ -117,6 +124,9 @@ func _ready() -> void:
 	# Randomize animation offset so zombies don't sync
 	anim_time = randf() * TAU
 
+	# Create health bar (hidden until damaged)
+	_create_health_bar()
+
 	# Start spawning sequence
 	current_state = State.SPAWNING
 	await get_tree().create_timer(0.3).timeout
@@ -153,6 +163,49 @@ func _generate_swipe_texture() -> ImageTexture:
 				img.set_pixel(x, y, Color(slash_color.r, slash_color.g, slash_color.b, 0.5 - j * 0.03))
 
 	return ImageTexture.create_from_image(img)
+
+
+func _create_health_bar() -> void:
+	health_bar_sprite = Sprite3D.new()
+	health_bar_sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	health_bar_sprite.pixel_size = 0.02
+	health_bar_sprite.position = Vector3(0, 1.8, 0)  # Above zombie head
+	health_bar_sprite.no_depth_test = true
+	health_bar_sprite.render_priority = 10
+	health_bar_sprite.visible = false
+	add_child(health_bar_sprite)
+
+	health_bar_image = Image.create(HEALTH_BAR_WIDTH, HEALTH_BAR_HEIGHT, false, Image.FORMAT_RGBA8)
+	health_bar_texture = ImageTexture.create_from_image(health_bar_image)
+	health_bar_sprite.texture = health_bar_texture
+
+
+func _update_health_bar() -> void:
+	if not health_bar_sprite or max_health <= 0:
+		return
+
+	var ratio := clampf(current_health / max_health, 0.0, 1.0)
+	var filled := int(ratio * HEALTH_BAR_WIDTH)
+
+	# Draw: black background, colored fill, dark red remainder
+	health_bar_image.fill(Color(0, 0, 0, 0.7))
+	for x in range(1, HEALTH_BAR_WIDTH - 1):
+		for y in range(1, HEALTH_BAR_HEIGHT - 1):
+			if x < filled:
+				# Green -> yellow -> red gradient based on health
+				var bar_color: Color
+				if ratio > 0.5:
+					bar_color = Color(0.1, 0.9, 0.1)
+				elif ratio > 0.25:
+					bar_color = Color(0.9, 0.9, 0.1)
+				else:
+					bar_color = Color(0.9, 0.1, 0.1)
+				health_bar_image.set_pixel(x, y, bar_color)
+			else:
+				health_bar_image.set_pixel(x, y, Color(0.2, 0.0, 0.0, 0.5))
+
+	health_bar_texture.update(health_bar_image)
+	health_bar_sprite.visible = true
 
 
 func _find_target_player() -> void:
@@ -395,6 +448,9 @@ func take_damage(amount: float, attacker: Node3D = null) -> void:
 
 	current_health -= amount
 	current_health = max(0, current_health)
+
+	# Update health bar
+	_update_health_bar()
 
 	# Flash white on hit
 	if sprite:
