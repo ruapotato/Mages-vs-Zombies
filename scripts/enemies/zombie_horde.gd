@@ -380,6 +380,10 @@ func _get_random_spawn_position() -> Vector3:
 	return Vector3(spawn_x, player.global_position.y + spawn_height_offset, spawn_z)
 
 func _apply_difficulty_scaling(zombie) -> void:  # ZombieBase
+	# Ensure zombie has the expected properties
+	if not zombie or not is_instance_valid(zombie):
+		return
+
 	# Calculate difficulty based on current day
 	if DayNightCycle:
 		# Estimate current day from game time
@@ -388,17 +392,31 @@ func _apply_difficulty_scaling(zombie) -> void:  # ZombieBase
 	difficulty_multiplier = 1.0 + (current_day * difficulty_scale_per_day)
 	difficulty_multiplier = min(difficulty_multiplier, max_difficulty_multiplier)
 
-	# Scale zombie stats
-	zombie.base_health *= difficulty_multiplier
-	zombie.base_damage *= difficulty_multiplier
-	# Don't scale speed too much, just a bit
-	zombie.base_speed *= (1.0 + (difficulty_multiplier - 1.0) * 0.3)
+	# Only apply scaling if zombie has these properties
+	if "base_health" in zombie:
+		zombie.base_health *= difficulty_multiplier
+	if "base_damage" in zombie:
+		zombie.base_damage *= difficulty_multiplier
+	if "base_speed" in zombie:
+		# Don't scale speed too much, just a bit
+		zombie.base_speed *= (1.0 + (difficulty_multiplier - 1.0) * 0.3)
 
-	# Reinitialize zombie with new stats
-	zombie.max_health = zombie.base_health * (zombie.night_health_multiplier if zombie.is_night_time else 1.0)
-	zombie.current_health = zombie.max_health
-	zombie.current_speed = zombie.base_speed * (zombie.night_speed_multiplier if zombie.is_night_time else 1.0)
-	zombie.current_damage = zombie.base_damage * (zombie.night_damage_multiplier if zombie.is_night_time else 1.0)
+	# Reinitialize zombie with new stats if it has them
+	if "max_health" in zombie and "base_health" in zombie:
+		var night_mult: float = zombie.night_health_multiplier if "night_health_multiplier" in zombie else 1.0
+		var is_night: bool = zombie.is_night_time if "is_night_time" in zombie else false
+		zombie.max_health = zombie.base_health * (night_mult if is_night else 1.0)
+		zombie.current_health = zombie.max_health
+
+	if "current_speed" in zombie and "base_speed" in zombie:
+		var night_mult: float = zombie.night_speed_multiplier if "night_speed_multiplier" in zombie else 1.0
+		var is_night: bool = zombie.is_night_time if "is_night_time" in zombie else false
+		zombie.current_speed = zombie.base_speed * (night_mult if is_night else 1.0)
+
+	if "current_damage" in zombie and "base_damage" in zombie:
+		var night_mult: float = zombie.night_damage_multiplier if "night_damage_multiplier" in zombie else 1.0
+		var is_night: bool = zombie.is_night_time if "is_night_time" in zombie else false
+		zombie.current_damage = zombie.base_damage * (night_mult if is_night else 1.0)
 
 func _update_player_cache() -> void:
 	cached_players.clear()

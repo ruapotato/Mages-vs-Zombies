@@ -11,6 +11,7 @@ class_name PlayerController
 @onready var mage_sprite: Sprite3D = $MageSprite
 @onready var staff_sprite: Sprite3D = $StaffSprite
 @onready var spell_spawn_point: Marker3D = $CameraMount/SpellSpawnPoint
+@onready var first_person_arms: FirstPersonArms = $CameraMount/Camera3D/FirstPersonArms
 
 # Movement parameters
 @export_group("Movement")
@@ -91,6 +92,40 @@ func _setup_mage_sprite() -> void:
 	if staff_sprite and TextureGenerator:
 		staff_sprite.texture = TextureGenerator.generate_staff_texture()
 		staff_sprite.visible = true
+
+	# Setup first-person arms (visible when looking down)
+	_setup_first_person_arms()
+
+
+func _setup_first_person_arms() -> void:
+	# Create first-person arms if not already present
+	if not first_person_arms and camera:
+		first_person_arms = FirstPersonArms.new()
+		first_person_arms.name = "FirstPersonArms"
+		camera.add_child(first_person_arms)
+
+	# Set spell color based on current slot
+	if first_person_arms:
+		_update_arm_spell_color()
+
+
+func _update_arm_spell_color() -> void:
+	if not first_person_arms:
+		return
+
+	# Color based on selected spell
+	var colors := {
+		"fireball": Color(1, 0.5, 0.2),
+		"ice_spike": Color(0.3, 0.7, 1.0),
+		"lightning": Color(1, 1, 0.3),
+		"heal": Color(0.3, 1, 0.4),
+		"shield": Color(0.5, 0.5, 1.0),
+	}
+
+	if current_spell_slot < spell_slots.size():
+		var spell_name = spell_slots[current_spell_slot]
+		var color = colors.get(spell_name, Color(0.6, 0.3, 0.9))
+		first_person_arms.set_spell_color(color)
 
 
 func _input(event: InputEvent) -> void:
@@ -216,6 +251,11 @@ func _cast_spell(slot_index: int) -> void:
 	current_mana -= mana_cost
 	spell_cooldown_timers[slot_index] = spell_cooldowns[slot_index] if slot_index < spell_cooldowns.size() else 1.0
 	current_spell_slot = slot_index
+
+	# Play arm cast animation
+	if first_person_arms:
+		first_person_arms.play_cast_animation()
+		_update_arm_spell_color()
 
 	var spell_name = spell_slots[slot_index] if slot_index < spell_slots.size() else "unknown"
 	_spawn_spell_effect(spell_name)

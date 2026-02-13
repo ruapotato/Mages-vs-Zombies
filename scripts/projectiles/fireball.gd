@@ -6,7 +6,7 @@ class_name Fireball
 
 # Projectile settings
 @export var speed: float = 20.0
-@export var gravity: float = 8.0
+@export var gravity_force: float = 8.0
 @export var damage: float = 25.0
 @export var explosion_radius: float = 2.0
 @export var lifetime: float = 10.0
@@ -144,7 +144,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	# Apply gravity (creates the arc)
-	velocity.y -= gravity * delta
+	velocity.y -= gravity_force * delta
 
 	# Move the projectile
 	global_position += velocity * delta

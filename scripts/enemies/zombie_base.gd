@@ -111,8 +111,14 @@ func _ready() -> void:
 		sprite.pixel_size = 0.02
 		sprite.modulate = Color(1.0, 1.0, 1.0, 0.0)  # Start invisible for spawn animation
 
-		# Generate zombie texture using ZombieTextureGenerator (static class)
-		sprite.texture = ZombieTextureGenerator.get_zombie_texture(zombie_type)
+		# Generate zombie texture using TextureGenerator autoload
+		if TextureGenerator and TextureGenerator.has_method("generate_zombie_texture"):
+			sprite.texture = TextureGenerator.generate_zombie_texture(zombie_type)
+		else:
+			# Fallback - create simple placeholder texture
+			var img = Image.create(32, 48, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0.3, 0.5, 0.3))  # Greenish zombie
+			sprite.texture = ImageTexture.create_from_image(img)
 
 		# Tank type is bigger
 		if zombie_type == "tank":

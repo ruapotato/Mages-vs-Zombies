@@ -7,6 +7,6 @@ collision_layer = 8
 collision_mask = 5
 script = ExtResource("1")
 speed = 20.0
-gravity = 8.0
+gravity_force = 8.0
 damage = 25.0
 explosion_radius = 2.0
