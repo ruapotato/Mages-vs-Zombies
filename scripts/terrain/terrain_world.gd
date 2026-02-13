@@ -179,14 +179,27 @@ func _update_chunks_around_position(world_pos: Vector3) -> void:
 		if chunk_info[2] > 2:
 			_load_chunk(chunk_info[0], chunk_info[1])
 
-	# Unload chunks too far away
+	# Unload chunks too far away AND update LOD for existing chunks
 	var chunks_to_unload: Array = []
 	for chunk_key in chunks:
 		var chunk = chunks[chunk_key]
 		var dist_x: int = chunk.chunk_x - center_chunk.x
 		var dist_z: int = chunk.chunk_z - center_chunk.y
-		if dist_x * dist_x + dist_z * dist_z > (view_distance + 2) * (view_distance + 2):
+		var dist_sq: int = dist_x * dist_x + dist_z * dist_z
+
+		if dist_sq > (view_distance + 2) * (view_distance + 2):
 			chunks_to_unload.append(chunk_key)
+		else:
+			# Check if LOD level needs updating
+			var current_lod: int = chunk_lod_levels.get(chunk_key, -1)
+			var new_lod: int = _get_chunk_lod_level(chunk.chunk_x, chunk.chunk_z)
+
+			# Re-generate mesh if LOD changed OR if close chunk is missing collision
+			var needs_collision: bool = new_lod <= 1 and not chunk_colliders.has(chunk_key)
+			if current_lod != new_lod or needs_collision:
+				if not pending_mesh_updates.has(chunk_key) and not mesh_updates_in_progress.has(chunk_key):
+					chunk.is_dirty = true
+					pending_mesh_updates.append(chunk_key)
 
 	for key in chunks_to_unload:
 		_unload_chunk(key)

@@ -291,6 +291,8 @@ func _spawn_random_zombie():  # -> ZombieBase
 	# Now set position (zombie is in tree)
 	zombie.global_position = spawn_pos
 
+	print("[ZombieHorde] Spawned %s at position %v" % [zombie_type, spawn_pos])
+
 	# Apply difficulty scaling
 	if enable_difficulty_scaling:
 		_apply_difficulty_scaling(zombie)
@@ -348,7 +350,7 @@ func _get_random_spawn_position() -> Vector3:
 	if not player:
 		return Vector3.ZERO
 
-	# Random angle and distance
+	# Random angle and distance - spawn closer for testing
 	var angle = randf() * TAU
 	var distance = randf_range(spawn_radius_min, spawn_radius_max)
 
@@ -362,7 +364,22 @@ func _get_random_spawn_position() -> Vector3:
 		var terrain = terrain_nodes[0]
 		if terrain.has_method("get_terrain_height"):
 			var height = terrain.get_terrain_height(Vector2(spawn_x, spawn_z))
-			return Vector3(spawn_x, height + spawn_height_offset, spawn_z)
+			# Also check if there's collision ready at this position
+			if terrain.has_method("has_collision_at_position"):
+				var spawn_pos = Vector3(spawn_x, height + spawn_height_offset, spawn_z)
+				if terrain.has_collision_at_position(spawn_pos):
+					return spawn_pos
+				# If no collision, try closer to player
+				for attempt in range(5):
+					var closer_distance = spawn_radius_min * (1.0 - attempt * 0.15)
+					spawn_x = player.global_position.x + cos(angle) * closer_distance
+					spawn_z = player.global_position.z + sin(angle) * closer_distance
+					height = terrain.get_terrain_height(Vector2(spawn_x, spawn_z))
+					spawn_pos = Vector3(spawn_x, height + spawn_height_offset, spawn_z)
+					if terrain.has_collision_at_position(spawn_pos):
+						return spawn_pos
+			else:
+				return Vector3(spawn_x, height + spawn_height_offset, spawn_z)
 
 	# Fallback: Try raycast with larger range
 	var space_state = get_world_3d().direct_space_state
