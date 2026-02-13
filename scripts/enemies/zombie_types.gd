@@ -39,10 +39,6 @@ class ZombieRunner extends ZombieBase:
 		attack_range = 2.0
 		attack_cooldown = 1.0  # Attacks faster too
 
-		# Faster animation
-		walk_bob_speed = 12.0
-		walk_lean_amount = 10.0  # Leans more when running
-
 	func _ready() -> void:
 		super._ready()
 
@@ -63,11 +59,6 @@ class ZombieBrute extends ZombieBase:
 		detection_range = 25.0
 		attack_range = 2.5
 		attack_cooldown = 2.5  # Slow attacks
-
-		# Heavier animation
-		walk_bob_speed = 5.0
-		walk_bob_height = 0.1
-		attack_swing_angle = 45.0
 
 	func _ready() -> void:
 		super._ready()
@@ -105,9 +96,6 @@ class ZombieMage extends ZombieBase:
 		detection_range = 30.0  # Detects from farther
 		attack_range = 18.0  # Keeps distance
 		attack_cooldown = 3.0
-
-		# Different animation style
-		walk_bob_speed = 6.0
 
 	func _ready() -> void:
 		super._ready()
@@ -231,9 +219,6 @@ class ZombieExploder extends ZombieBase:
 		detection_range = 25.0
 		attack_range = 2.0
 		attack_cooldown = 1.5
-
-		# Pulsing animation
-		walk_bob_speed = 10.0
 
 	func _ready() -> void:
 		super._ready()
