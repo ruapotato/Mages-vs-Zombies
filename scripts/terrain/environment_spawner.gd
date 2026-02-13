@@ -25,10 +25,15 @@ var player: Node3D = null
 var last_spawn_center: Vector3 = Vector3.ZERO
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
-# Object pools
-var tree_pool: Array[Sprite3D] = []
+# Object pools - trees are now StaticBody3D with sprites
+var tree_pool: Array[StaticBody3D] = []
 var rock_pool: Array[Sprite3D] = []
 var grass_pool: Array[Sprite3D] = []
+
+# Tree health tracking
+var tree_health: Dictionary = {}  # tree_instance_id -> health
+const TREE_MAX_HEALTH: float = 100.0
+const TREE_COLLISION_LAYER: int = 1  # World layer
 
 # Active objects tracking
 var active_trees: Dictionary = {}  # key -> Sprite3D
@@ -78,6 +83,7 @@ const BIOME_HAS_GRASS: Dictionary = {
 
 
 func _ready() -> void:
+	add_to_group("environment_spawner")
 	print("[EnvironmentSpawner] Initializing...")
 
 	# Wait a frame for other nodes to be ready
@@ -212,12 +218,12 @@ func _generate_grass_texture() -> void:
 
 
 func _create_object_pools() -> void:
-	# Create tree pool
+	# Create tree pool - each tree is a StaticBody3D with collision
 	for _i in range(max_trees):
-		var sprite = _create_billboard_sprite()
-		sprite.visible = false
-		add_child(sprite)
-		tree_pool.append(sprite)
+		var tree = _create_tree_body()
+		tree.visible = false
+		add_child(tree)
+		tree_pool.append(tree)
 
 	# Create rock pool
 	for _i in range(max_rocks):
@@ -238,6 +244,34 @@ func _create_object_pools() -> void:
 		grass_pool.append(sprite)
 
 	print("[EnvironmentSpawner] Created object pools: %d trees, %d rocks, %d grass" % [max_trees, max_rocks, max_grass])
+
+
+func _create_tree_body() -> StaticBody3D:
+	# Create a StaticBody3D for tree collision
+	var body = StaticBody3D.new()
+	body.collision_layer = TREE_COLLISION_LAYER
+	body.collision_mask = 0  # Trees don't need to detect other things
+
+	# Add collision shape (cylinder for trunk)
+	var collision = CollisionShape3D.new()
+	var capsule = CapsuleShape3D.new()
+	capsule.radius = 0.4
+	capsule.height = 3.0
+	collision.shape = capsule
+	collision.position = Vector3(0, 1.5, 0)  # Center the capsule
+	body.add_child(collision)
+
+	# Add sprite
+	var sprite = _create_billboard_sprite()
+	body.add_child(sprite)
+
+	# Add to destructible group
+	body.add_to_group("destructible_trees")
+
+	# Initialize health
+	tree_health[body.get_instance_id()] = TREE_MAX_HEALTH
+
+	return body
 
 
 func _create_billboard_sprite() -> Sprite3D:
@@ -411,9 +445,13 @@ func _biome_has_grass(biome: String) -> bool:
 	return BIOME_HAS_GRASS.get(biome, true)
 
 
-func _place_tree(sprite: Sprite3D, pos: Vector3, tree_type: String) -> void:
+func _place_tree(tree_body: StaticBody3D, pos: Vector3, tree_type: String) -> void:
+	var sprite: Sprite3D = tree_body.get_child(1) as Sprite3D  # Child 0 is collision, child 1 is sprite
+	if not sprite:
+		return
+
 	sprite.texture = tree_textures.get(tree_type, tree_textures["oak"])
-	sprite.pixel_size = 0.04 + rng.randf() * 0.02  # Bigger trees (was 0.025)
+	sprite.pixel_size = 0.04 + rng.randf() * 0.02  # Bigger trees
 
 	# Offset Y so tree base is at ground level (texture is 128 tall, centered)
 	var tex_height = sprite.texture.get_height() if sprite.texture else 128
@@ -423,12 +461,27 @@ func _place_tree(sprite: Sprite3D, pos: Vector3, tree_type: String) -> void:
 	var scale_var = 0.9 + rng.randf() * 0.6  # Range 0.9 to 1.5
 	sprite.scale = Vector3.ONE * scale_var
 
-	# Position tree so base is at ground
-	sprite.position = pos + Vector3(0, world_height * 0.48 * scale_var, 0)
+	# Position sprite relative to body
+	sprite.position = Vector3(0, world_height * 0.48 * scale_var, 0)
 
-	# Random rotation
-	sprite.rotation.y = rng.randf() * TAU
-	sprite.visible = true
+	# Position the tree body at ground level
+	tree_body.position = pos
+
+	# Random rotation (rotate the body, not the sprite, since sprite is billboard)
+	tree_body.rotation.y = rng.randf() * TAU
+
+	# Reset health
+	tree_health[tree_body.get_instance_id()] = TREE_MAX_HEALTH
+
+	# Update collision shape based on scale
+	var collision: CollisionShape3D = tree_body.get_child(0) as CollisionShape3D
+	if collision and collision.shape is CapsuleShape3D:
+		var capsule: CapsuleShape3D = collision.shape
+		capsule.radius = 0.4 * scale_var
+		capsule.height = 3.0 * scale_var
+		collision.position = Vector3(0, 1.5 * scale_var, 0)
+
+	tree_body.visible = true
 
 
 # Biome rock colors
@@ -467,6 +520,63 @@ func _place_rock(sprite: Sprite3D, pos: Vector3, biome: String = "valley") -> vo
 
 	sprite.rotation.y = rng.randf() * TAU
 	sprite.visible = true
+
+
+## Damage a tree - call this when tree is hit by spell/attack
+func damage_tree(tree_body: StaticBody3D, damage: float) -> void:
+	var tree_id = tree_body.get_instance_id()
+	if tree_id not in tree_health:
+		tree_health[tree_id] = TREE_MAX_HEALTH
+
+	tree_health[tree_id] -= damage
+
+	# Visual feedback - flash white
+	var sprite: Sprite3D = tree_body.get_child(1) as Sprite3D
+	if sprite:
+		sprite.modulate = Color.WHITE
+		await get_tree().create_timer(0.05).timeout
+		if is_instance_valid(sprite):
+			sprite.modulate = Color(1.0, 1.0, 1.0)
+
+	# Check if tree is destroyed
+	if tree_health[tree_id] <= 0:
+		_destroy_tree(tree_body)
+
+
+## Destroy a tree with falling animation
+func _destroy_tree(tree_body: StaticBody3D) -> void:
+	if not is_instance_valid(tree_body):
+		return
+
+	# Disable collision immediately
+	tree_body.collision_layer = 0
+
+	var sprite: Sprite3D = tree_body.get_child(1) as Sprite3D
+	if sprite:
+		# Fall over animation
+		var fall_direction = randf() * TAU  # Random fall direction
+		var tween = create_tween()
+		tween.set_parallel(true)
+		tween.tween_property(sprite, "rotation:x", -PI/2, 0.5).set_ease(Tween.EASE_IN)
+		tween.tween_property(sprite, "position:y", 0.2, 0.5)
+		tween.tween_property(sprite, "modulate:a", 0.0, 1.0).set_delay(0.5)
+		tween.chain().tween_callback(func():
+			if is_instance_valid(tree_body):
+				tree_body.visible = false
+				# Return to pool (reset for reuse)
+				tree_health[tree_body.get_instance_id()] = TREE_MAX_HEALTH
+				tree_body.collision_layer = TREE_COLLISION_LAYER
+		)
+	else:
+		tree_body.visible = false
+
+
+## Static method to find and damage a tree by its body
+static func find_tree_spawner() -> EnvironmentSpawner:
+	var spawners = Engine.get_main_loop().root.get_tree().get_nodes_in_group("environment_spawner")
+	if spawners.size() > 0:
+		return spawners[0] as EnvironmentSpawner
+	return null
 
 
 func _place_grass(sprite: Sprite3D, pos: Vector3, biome: String = "valley") -> void:

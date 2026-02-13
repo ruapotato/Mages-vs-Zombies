@@ -6,7 +6,7 @@ signal game_started
 signal game_over(survived_days: int)
 signal day_changed(day_number: int)
 signal night_danger_level_changed(level: float)
-signal zombie_killed(zombie_type: String, position: Vector3)
+signal zombie_killed(zombie_type: String, position: Vector3, points: int, was_headshot: bool)
 signal player_died
 signal shelter_entered
 signal shelter_exited
@@ -32,6 +32,12 @@ var player_max_health: float = 100.0
 var player_mana: float = 100.0
 var player_max_mana: float = 100.0
 var mana_regen_rate: float = 5.0  # Per second
+var player_points: int = 0
+var headshot_kills: int = 0
+
+# Point values
+const HEADSHOT_KILL_POINTS: int = 100
+const BODY_KILL_POINTS: int = 50
 
 # Shelter system
 var player_in_shelter: bool = false
@@ -70,6 +76,8 @@ func start_game() -> void:
 	total_play_time = 0.0
 	player_health = player_max_health
 	player_mana = player_max_mana
+	player_points = 0
+	headshot_kills = 0
 	is_night = false
 	night_danger_multiplier = 1.0
 	game_started.emit()
@@ -156,9 +164,44 @@ func exit_shelter() -> void:
 	print("[GameManager] Left shelter - EXPOSED!")
 
 # Combat
-func on_zombie_killed(zombie_type: String, position: Vector3) -> void:
+func on_zombie_killed(zombie_type: String, position: Vector3, was_headshot: bool = false, hit_position: Vector3 = Vector3.ZERO) -> void:
 	zombies_killed += 1
-	zombie_killed.emit(zombie_type, position)
+
+	# Calculate points - headshot = 100, body = 50
+	var points: int = HEADSHOT_KILL_POINTS if was_headshot else BODY_KILL_POINTS
+	player_points += points
+
+	if was_headshot:
+		headshot_kills += 1
+
+	# Spawn 3D point popup at hit location
+	var popup_pos: Vector3 = hit_position if hit_position != Vector3.ZERO else position + Vector3(0, 1.5, 0)
+	_spawn_point_popup(popup_pos, points, was_headshot)
+
+	zombie_killed.emit(zombie_type, position, points, was_headshot)
+
+
+func _spawn_point_popup(position: Vector3, points: int, is_headshot: bool) -> void:
+	# Create a 3D label to show points
+	var label := Label3D.new()
+	label.text = "+%d" % points
+	label.font_size = 48 if is_headshot else 32
+	label.modulate = Color.YELLOW if is_headshot else Color.WHITE
+	label.outline_size = 8
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true  # Always visible
+
+	var game_scene: Node = get_tree().current_scene
+	if game_scene:
+		game_scene.add_child(label)
+		label.global_position = position
+
+		# Animate: float up and fade out
+		var tween := create_tween()
+		tween.set_parallel(true)
+		tween.tween_property(label, "position:y", position.y + 2.0, 1.0)
+		tween.tween_property(label, "modulate:a", 0.0, 1.0)
+		tween.chain().tween_callback(label.queue_free)
 
 func damage_player(amount: float) -> void:
 	player_health -= amount

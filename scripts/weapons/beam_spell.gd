@@ -109,6 +109,13 @@ func _update_beam(delta: float) -> void:
 			beam_target = collider
 		elif collider and collider.get_parent() and collider.get_parent().has_method("take_damage"):
 			beam_target = collider.get_parent()
+		elif collider and collider.is_in_group("destructible_trees"):
+			# Hit a tree - damage it
+			beam_target = null
+			damage_tick_timer += delta
+			if damage_tick_timer >= spell_data.tick_interval:
+				damage_tick_timer = 0.0
+				damage_destructible(collider, spell_data.damage_per_tick if spell_data else base_damage, beam_hit_position)
 		else:
 			beam_target = null
 
@@ -158,7 +165,7 @@ func _apply_beam_damage() -> void:
 		return
 
 	var damage := spell_data.damage_per_tick if spell_data else base_damage
-	apply_damage_to_enemy(beam_target, damage)
+	apply_damage_to_enemy(beam_target, damage, beam_hit_position)
 
 	# Create hit effect
 	_spawn_beam_hit_effect(beam_hit_position)
@@ -205,8 +212,8 @@ func _chain_lightning_to(from_position: Vector3, target_enemy: Node) -> void:
 	if spell_data.chain_damage_falloff < 1.0:
 		chain_damage = int(chain_damage * spell_data.chain_damage_falloff)
 
-	# Apply damage
-	apply_damage_to_enemy(target_enemy, chain_damage)
+	# Apply damage - hit enemy center
+	apply_damage_to_enemy(target_enemy, chain_damage, target_enemy.global_position + Vector3(0, 1.0, 0))
 
 	# Create chain visual
 	_spawn_chain_visual(from_position, target_enemy.global_position)

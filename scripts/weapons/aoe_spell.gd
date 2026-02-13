@@ -147,10 +147,11 @@ func _start_instant_aoe() -> void:
 	aoe_area.global_position = aoe_center
 	aoe_area.monitoring = true
 
-	# Get enemies and damage them
+	# Get enemies and damage them (hit center mass for AOE)
 	var enemies := _get_enemies_in_aoe()
 	for enemy in enemies:
-		apply_damage_to_enemy(enemy, base_damage)
+		var hit_pos: Vector3 = enemy.global_position + Vector3(0, 0.9, 0)
+		apply_damage_to_enemy(enemy, base_damage, hit_pos)
 
 	# Visual effect
 	_spawn_nova_effect()
@@ -235,7 +236,8 @@ func _update_standard_aoe(delta: float) -> void:
 		var enemies := _get_enemies_in_aoe()
 		for enemy in enemies:
 			var damage := spell_data.damage_per_tick if spell_data.damage_per_tick > 0 else base_damage
-			apply_damage_to_enemy(enemy, damage)
+			var hit_pos: Vector3 = enemy.global_position + Vector3(0, 0.9, 0)
+			apply_damage_to_enemy(enemy, damage, hit_pos)
 
 
 func _update_meteor_storm(delta: float) -> void:
@@ -271,7 +273,8 @@ func _update_flame_wave(delta: float) -> void:
 
 		var enemies := _get_enemies_in_aoe()
 		for enemy in enemies:
-			apply_damage_to_enemy(enemy, base_damage)
+			var hit_pos: Vector3 = enemy.global_position + Vector3(0, 0.9, 0)
+			apply_damage_to_enemy(enemy, base_damage, hit_pos)
 
 		# Apply knockback
 		if spell_data.knockback_force > 0.0:

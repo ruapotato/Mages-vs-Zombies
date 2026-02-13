@@ -252,14 +252,25 @@ func raycast_from_camera(max_distance: float = 100.0) -> Dictionary:
 
 	var space_state := get_world_3d().direct_space_state
 	var query := PhysicsRayQueryParameters3D.create(from, to)
-	query.collision_mask = 0b1101  # World, enemy, interactable
+	query.collision_mask = 0b1111  # World, player, enemy, interactable (includes trees)
 	query.collide_with_areas = true
 	query.exclude = [owner_player]
 
 	return space_state.intersect_ray(query)
 
 
-func apply_damage_to_enemy(enemy: Node, damage: int, is_critical: bool = false) -> void:
+## Damage a destructible object (tree, etc.)
+func damage_destructible(collider: Node, damage: int, hit_position: Vector3 = Vector3.ZERO) -> void:
+	# Check if it's a tree
+	if collider.is_in_group("destructible_trees"):
+		var spawners = get_tree().get_nodes_in_group("environment_spawner")
+		if spawners.size() > 0:
+			var spawner = spawners[0]
+			if spawner.has_method("damage_tree"):
+				spawner.damage_tree(collider, float(damage))
+
+
+func apply_damage_to_enemy(enemy: Node, damage: int, hit_position: Vector3 = Vector3.ZERO) -> void:
 	if not enemy or not enemy.has_method("take_damage"):
 		return
 
@@ -273,8 +284,9 @@ func apply_damage_to_enemy(enemy: Node, damage: int, is_critical: bool = false) 
 	# Apply status effects based on damage type
 	_apply_status_effects(enemy)
 
-	# Deal damage
-	enemy.take_damage(final_damage, owner_player, is_critical, enemy.global_position)
+	# Deal damage - pass hit position for headshot detection
+	var damage_position: Vector3 = hit_position if hit_position != Vector3.ZERO else enemy.global_position + Vector3(0, 1.0, 0)
+	enemy.take_damage(final_damage, owner_player, damage_position)
 
 	# Lifesteal
 	if spell_data and spell_data.lifesteal_percent > 0.0 and owner_player:

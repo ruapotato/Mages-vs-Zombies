@@ -215,11 +215,11 @@ func _on_body_entered(body: Node) -> void:
 
 		enemies_hit.append(enemy_node)
 
-		# Deal damage
+		# Deal damage - pass hit position for headshot detection
 		if owner_spell:
-			owner_spell.apply_damage_to_enemy(enemy_node, damage)
+			owner_spell.apply_damage_to_enemy(enemy_node, damage, global_position)
 		else:
-			enemy_node.take_damage(damage, owner_player, false, global_position)
+			enemy_node.take_damage(damage, owner_player, global_position)
 
 		# Spawn hit effect
 		_spawn_hit_effect()
@@ -235,6 +235,17 @@ func _on_body_entered(body: Node) -> void:
 			else:
 				_destroy()
 			return
+
+	# Check if we hit a destructible tree
+	if body.is_in_group("destructible_trees"):
+		if owner_spell:
+			owner_spell.damage_destructible(body, damage, global_position)
+		_spawn_hit_effect()
+		if explosion_radius > 0.0:
+			_explode()
+		else:
+			_destroy()
+		return
 
 	# Hit world or non-enemy
 	if explosion_radius > 0.0:
@@ -265,10 +276,12 @@ func _explode() -> void:
 	for result in results:
 		var enemy: Node = result.collider
 		if enemy and enemy.has_method("take_damage"):
+			# For explosions, hit center mass (not headshot)
+			var hit_pos: Vector3 = enemy.global_position + Vector3(0, 0.9, 0)
 			if owner_spell:
-				owner_spell.apply_damage_to_enemy(enemy, damage)
+				owner_spell.apply_damage_to_enemy(enemy, damage, hit_pos)
 			else:
-				enemy.take_damage(damage, owner_player, false, global_position)
+				enemy.take_damage(damage, owner_player, hit_pos)
 
 	# Spawn explosion effect
 	_spawn_explosion_effect()

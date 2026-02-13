@@ -4,7 +4,7 @@ class_name ZombieBase
 ## ZombieBase - Paper Mario style 2D billboard zombie in 3D world
 ## Based on Zombies-vs-Humans BillboardZombie implementation
 
-signal died(zombie: ZombieBase)
+signal died(zombie: ZombieBase, was_headshot: bool, hit_position: Vector3)
 signal hit_player(zombie: ZombieBase, damage: float)
 
 # Zombie states
@@ -47,6 +47,11 @@ var is_night_time: bool = false
 var can_attack: bool = true
 var target_player: Node3D = null
 var players_in_attack_range: Array[Node3D] = []
+
+# Headshot tracking - based on hit height on the mesh
+var last_hit_was_headshot: bool = false
+var last_hit_position: Vector3 = Vector3.ZERO
+const HEADSHOT_HEIGHT_RATIO: float = 0.7  # Top 30% of zombie height is "head"
 
 # Animation state (matching ZvH)
 var anim_time: float = 0.0
@@ -442,12 +447,19 @@ func _update_time_scaling() -> void:
 				sprite.modulate = Color(1.0, 1.0, 1.0)
 
 
-func take_damage(amount: float, attacker: Node3D = null) -> void:
+func take_damage(amount: float, attacker: Node3D = null, hit_position: Vector3 = Vector3.ZERO) -> void:
 	if current_state == State.DYING or current_state == State.DEAD:
 		return
 
 	current_health -= amount
 	current_health = max(0, current_health)
+
+	# Determine if headshot based on hit height
+	last_hit_position = hit_position if hit_position != Vector3.ZERO else global_position + Vector3(0, 1.0, 0)
+	var zombie_base_y = global_position.y
+	var zombie_height = 1.8  # Approximate zombie height
+	var hit_height_ratio = (last_hit_position.y - zombie_base_y) / zombie_height
+	last_hit_was_headshot = hit_height_ratio >= HEADSHOT_HEIGHT_RATIO
 
 	# Update health bar
 	_update_health_bar()
@@ -473,7 +485,11 @@ func die() -> void:
 	collision_layer = 0
 	collision_mask = 0
 
-	died.emit(self)
+	# Notify GameManager with headshot info for points
+	if GameManager:
+		GameManager.on_zombie_killed(zombie_type, global_position, last_hit_was_headshot, last_hit_position)
+
+	died.emit(self, last_hit_was_headshot, last_hit_position)
 
 
 func _on_attack_timer_timeout() -> void:
