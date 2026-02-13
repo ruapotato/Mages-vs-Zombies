@@ -336,15 +336,15 @@ func _roll_zombie_type() -> String:
 	var weights: Dictionary = BIOME_ZOMBIE_WEIGHTS.get(biome, BIOME_ZOMBIE_WEIGHTS["valley"])
 
 	# Calculate weighted probabilities
-	var walker_w := walker_probability * weights.get("walker", 1.0)
-	var runner_w := runner_probability * weights.get("runner", 1.0)
-	var brute_w := brute_probability * weights.get("brute", 1.0)
-	var mage_w := mage_probability * weights.get("mage", 1.0)
-	var exploder_w := exploder_probability * weights.get("exploder", 1.0)
+	var walker_w: float = walker_probability * float(weights.get("walker", 1.0))
+	var runner_w: float = runner_probability * float(weights.get("runner", 1.0))
+	var brute_w: float = brute_probability * float(weights.get("brute", 1.0))
+	var mage_w: float = mage_probability * float(weights.get("mage", 1.0))
+	var exploder_w: float = exploder_probability * float(weights.get("exploder", 1.0))
 
-	var total := walker_w + runner_w + brute_w + mage_w + exploder_w
-	var roll := randf() * total
-	var cumulative := 0.0
+	var total: float = walker_w + runner_w + brute_w + mage_w + exploder_w
+	var roll: float = randf() * total
+	var cumulative: float = 0.0
 
 	# Check each type in order
 	cumulative += walker_w
