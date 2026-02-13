@@ -26,7 +26,7 @@ signal all_zombies_defeated()
 @export var spawn_radius_max: float = 40.0
 @export var night_spawn_multiplier: float = 2.0  # 2x more zombies at night!
 @export var night_spawn_rate_multiplier: float = 1.5  # Spawn 50% faster at night
-@export var spawn_height_offset: float = 3.0  # Spawn well above ground to avoid mesh clipping
+@export var spawn_height_offset: float = 0.0  # Spawn at ground level (collision shape offset handles positioning)
 
 # LOD (Level of Detail) settings - from original implementation
 @export_group("LOD Settings")

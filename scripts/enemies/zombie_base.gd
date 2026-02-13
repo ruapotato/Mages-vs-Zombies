@@ -195,11 +195,25 @@ func _process_idle(delta: float) -> void:
 	if lod_level >= 2:
 		return
 
-	# Look for player
+	# If no target, actively search for players
+	if not target_player or not is_instance_valid(target_player):
+		var players = get_tree().get_nodes_in_group("player")
+		if players.size() > 0:
+			# Find closest player
+			var closest_dist := INF
+			for p in players:
+				var dist := global_position.distance_to(p.global_position)
+				if dist < closest_dist:
+					closest_dist = dist
+					target_player = p
+			print("[Zombie] Found player target at distance %.1f" % closest_dist)
+
+	# Look for player and start chasing
 	if target_player and is_instance_valid(target_player):
 		var distance = global_position.distance_to(target_player.global_position)
 		if distance <= detection_range:
 			current_state = State.CHASING
+			print("[Zombie] Starting to chase player!")
 
 	# Slight idle bob
 	animation_time += delta * 2.0

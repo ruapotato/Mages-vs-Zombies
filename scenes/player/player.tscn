@@ -33,7 +33,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, 0.04204014)
 visible = false
 pixel_size = 0.025
-billboard = 1
+billboard = 2
 alpha_cut = 1
 texture_filter = 0
 
@@ -41,6 +41,6 @@ texture_filter = 0
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.25, 1.1, 0.092040144)
 visible = false
 pixel_size = 0.02
-billboard = 1
+billboard = 2
 alpha_cut = 1
 texture_filter = 0
