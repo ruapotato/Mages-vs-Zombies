@@ -26,7 +26,7 @@ signal all_zombies_defeated()
 @export var spawn_radius_max: float = 40.0
 @export var night_spawn_multiplier: float = 2.0  # 2x more zombies at night!
 @export var night_spawn_rate_multiplier: float = 1.5  # Spawn 50% faster at night
-@export var spawn_height_offset: float = 1.0
+@export var spawn_height_offset: float = 2.0  # Spawn above ground to avoid clipping
 
 # LOD (Level of Detail) settings - from original implementation
 @export_group("LOD Settings")
@@ -163,9 +163,9 @@ func _on_zombie_added(node: Node) -> void:
 	if initial_target and "state" in zombie:
 		zombie.set("state", 2)  # CHASING
 
-	# Connect died signal
+	# Connect died signal (signal already passes self as argument)
 	if zombie.has_signal("died"):
-		zombie.died.connect(_on_zombie_died.bind(zombie))
+		zombie.died.connect(_on_zombie_died)
 
 func _on_zombie_removed(node: Node) -> void:
 	if node in all_zombies:
@@ -301,7 +301,7 @@ func _spawn_random_zombie():  # -> ZombieBase
 	if not zombies_container:
 		all_zombies.append(zombie)
 		total_zombies_spawned += 1
-		zombie.died.connect(_on_zombie_died.bind(zombie))
+		zombie.died.connect(_on_zombie_died)
 
 	emit_signal("zombie_spawned", zombie)
 
@@ -773,7 +773,7 @@ func spawn_zombies(count: int, zombie_type: String = "") -> void:
 					add_child(zombie)
 				if not zombies_container:
 					all_zombies.append(zombie)
-					zombie.died.connect(_on_zombie_died.bind(zombie))
+					zombie.died.connect(_on_zombie_died)
 					total_zombies_spawned += 1
 
 ## Clear all zombies (for testing or game reset)
