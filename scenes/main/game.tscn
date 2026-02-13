@@ -14,16 +14,15 @@ shader = ExtResource("8_sky_shader")
 shader_parameter/sky_top_color = Vector3(0.3, 0.5, 0.9)
 shader_parameter/sky_horizon_color = Vector3(0.55, 0.7, 0.9)
 shader_parameter/ground_color = Vector3(0.2, 0.2, 0.2)
+shader_parameter/sun_direction = Vector3(0.3, 0.7, -0.5)
 shader_parameter/sun_color = Vector3(1.0, 0.95, 0.8)
 shader_parameter/sun_size = 0.05
+shader_parameter/sun_energy = 1.2
 shader_parameter/star_brightness = 0.0
-shader_parameter/star_density = 0.5
 shader_parameter/moon_direction = Vector3(0.5, 0.3, -0.8)
 shader_parameter/moon_size = 0.045
 shader_parameter/moon_phase = 0.5
 shader_parameter/cloud_coverage = 0.0
-shader_parameter/cloud_darkness = 0.0
-shader_parameter/cloud_speed = 0.02
 
 [sub_resource type="Sky" id="Sky_main"]
 sky_material = SubResource("ShaderMaterial_sky")

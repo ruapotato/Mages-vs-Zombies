@@ -463,11 +463,12 @@ func _update_sky() -> void:
 		star_brightness = 1.0
 
 	# Update shader parameters
-	# Note: Shader uses LIGHT0_DIRECTION and LIGHT0_ENERGY from DirectionalLight3D for sun
 	sky_material.set_shader_parameter("sky_top_color", Vector3(sky_top.r, sky_top.g, sky_top.b))
 	sky_material.set_shader_parameter("sky_horizon_color", Vector3(sky_horizon.r, sky_horizon.g, sky_horizon.b))
 	sky_material.set_shader_parameter("ground_color", Vector3(ground.r, ground.g, ground.b))
 	sky_material.set_shader_parameter("star_brightness", star_brightness)
+	sky_material.set_shader_parameter("sun_direction", _cached_sun_direction)
+	sky_material.set_shader_parameter("sun_energy", _cached_sun_energy)
 
 	# Update moon position and phase
 	_update_moon()
