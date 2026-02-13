@@ -24,6 +24,7 @@ signal all_zombies_defeated()
 @export_group("Spawn Settings")
 @export var spawn_radius_min: float = 20.0
 @export var spawn_radius_max: float = 40.0
+@export var despawn_radius: float = 80.0  # Despawn zombies beyond this distance from player
 @export var night_spawn_multiplier: float = 2.0  # 2x more zombies at night!
 @export var night_spawn_rate_multiplier: float = 1.5  # Spawn 50% faster at night
 @export var spawn_height_offset: float = 1.0  # Spawn slightly above ground to avoid embedding in terrain
@@ -736,11 +737,31 @@ func _process_sync_batch() -> void:
 
 func _cleanup_dead_zombies() -> void:
 	var valid_zombies: Array[Node3D] = []
+	var player_pos: Vector3 = player.global_position if player else Vector3.ZERO
+	var despawned_count: int = 0
+
 	for zombie in all_zombies:
-		if is_instance_valid(zombie):
-			var state = zombie.get("current_state") if "current_state" in zombie else 0
-			if state != 5:  # Not DEAD
-				valid_zombies.append(zombie)
+		if not is_instance_valid(zombie):
+			continue
+
+		var state = zombie.get("current_state") if "current_state" in zombie else 0
+		if state == 5:  # DEAD
+			continue
+
+		# Check distance from player - despawn if too far
+		if player:
+			var dist_to_player := zombie.global_position.distance_to(player_pos)
+			if dist_to_player > despawn_radius:
+				# Despawn this zombie - it's too far from player
+				zombie_data.erase(zombie)
+				zombie.queue_free()
+				despawned_count += 1
+				continue
+
+		valid_zombies.append(zombie)
+
+	if despawned_count > 0:
+		print("[ZombieHorde] Despawned %d zombies (too far from player)" % despawned_count)
 
 	all_zombies = valid_zombies
 
