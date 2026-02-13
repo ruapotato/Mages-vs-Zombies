@@ -15,8 +15,8 @@ func _execute_spell() -> void:
 	for i in range(missile_count):
 		_spawn_projectile(i, missile_count)
 
-	# Play impact sound at cast origin
-	AudioManager.play_sound_3d(spell_data.impact_sound, get_cast_origin(), -3.0)
+	# TODO: Add AudioManager for impact sound
+	# AudioManager.play_sound_3d(spell_data.impact_sound, get_cast_origin(), -3.0)
 
 
 func _spawn_projectile(index: int = 0, total_count: int = 1) -> void:

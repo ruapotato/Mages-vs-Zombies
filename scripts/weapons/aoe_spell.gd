@@ -131,8 +131,8 @@ func _start_standard_aoe() -> void:
 	aoe_light.omni_range = spell_data.aoe_radius * 2.0
 	aoe_light.visible = true
 
-	# Play sound
-	AudioManager.play_sound_3d(spell_data.impact_sound, aoe_center, 0.0)
+	# TODO: Add AudioManager for impact sound
+	# AudioManager.play_sound_3d(spell_data.impact_sound, aoe_center, 0.0)
 
 
 func _start_instant_aoe() -> void:
@@ -155,8 +155,8 @@ func _start_instant_aoe() -> void:
 	# Visual effect
 	_spawn_nova_effect()
 
-	# Play sound
-	AudioManager.play_sound_3d(spell_data.impact_sound, aoe_center, 0.0)
+	# TODO: Add AudioManager for impact sound
+	# AudioManager.play_sound_3d(spell_data.impact_sound, aoe_center, 0.0)
 
 	# Clean up
 	aoe_area.monitoring = false
@@ -183,8 +183,8 @@ func _start_meteor_storm() -> void:
 		cylinder.bottom_radius = spell_data.aoe_radius
 	aoe_mesh.visible = true
 
-	# Play sound
-	AudioManager.play_sound_3d(spell_data.cast_sound, aoe_center, 0.0)
+	# TODO: Add AudioManager for cast sound
+	# AudioManager.play_sound_3d(spell_data.cast_sound, aoe_center, 0.0)
 
 
 func _start_expanding_wave() -> void:
@@ -205,8 +205,8 @@ func _start_expanding_wave() -> void:
 	aoe_mesh.global_position = aoe_center
 	aoe_mesh.visible = true
 
-	# Play sound
-	AudioManager.play_sound_3d(spell_data.impact_sound, aoe_center, 0.0)
+	# TODO: Add AudioManager for impact sound
+	# AudioManager.play_sound_3d(spell_data.impact_sound, aoe_center, 0.0)
 
 
 func _update_aoe(delta: float) -> void:

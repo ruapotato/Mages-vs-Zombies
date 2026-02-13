@@ -77,9 +77,9 @@ func _start_beam() -> void:
 	chained_targets.clear()
 	damage_tick_timer = 0.0
 
-	# Play beam sound
-	if spell_data:
-		AudioManager.play_sound_3d(spell_data.impact_sound, global_position, 0.0)
+	# TODO: Add AudioManager for beam sound
+	# if spell_data:
+	# 	AudioManager.play_sound_3d(spell_data.impact_sound, global_position, 0.0)
 
 
 func _stop_beam() -> void:
@@ -211,8 +211,8 @@ func _chain_lightning_to(from_position: Vector3, target_enemy: Node) -> void:
 	# Create chain visual
 	_spawn_chain_visual(from_position, target_enemy.global_position)
 
-	# Play chain sound
-	AudioManager.play_sound_3d("lightning_chain", target_enemy.global_position, -5.0)
+	# TODO: Add AudioManager for chain sound
+	# AudioManager.play_sound_3d("lightning_chain", target_enemy.global_position, -5.0)
 
 
 func _spawn_chain_visual(from: Vector3, to: Vector3) -> void:

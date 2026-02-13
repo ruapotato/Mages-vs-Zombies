@@ -24,6 +24,7 @@ DayNightCycle="*res://scripts/autoload/day_night_cycle.gd"
 SpellRegistry="*res://scripts/autoload/spell_registry.gd"
 NetworkManager="*res://scripts/autoload/network_manager.gd"
 TextureGenerator="*res://scripts/autoload/texture_generator.gd"
+ZombieTextureGenerator="*res://scripts/autoload/zombie_texture_generator.gd"
 
 [display]
 
@@ -139,13 +140,8 @@ spell_5={
 3d_physics/layer_5="Interactable"
 3d_physics/layer_6="Building"
 
-[physics]
-
-common/physics_ticks_per_second=60
-
 [rendering]
 
-renderer/rendering_method="forward_plus"
 textures/canvas_textures/default_texture_filter=0
 anti_aliasing/quality/msaa_3d=2
 environment/defaults/default_clear_color=Color(0.1, 0.1, 0.15, 1)

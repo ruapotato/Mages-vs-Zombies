@@ -60,9 +60,10 @@ func _update_proximity_effects() -> void:
 	if not is_lit:
 		return
 
-	# Find nearest player distance (uses cached player list)
+	# Find nearest player distance
 	var min_distance := INF
-	for player in EnemyAI._get_cached_players(get_tree()):
+	var players := get_tree().get_nodes_in_group("players")
+	for player in players:
 		if is_instance_valid(player):
 			var dist := global_position.distance_to(player.global_position)
 			if dist < min_distance:

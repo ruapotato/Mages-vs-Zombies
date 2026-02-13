@@ -186,3 +186,15 @@ func get_difficulty_scale() -> float:
 
 func is_playing() -> bool:
 	return current_state == GameState.PLAYING
+
+# Player registration (for multiplayer)
+var registered_players: Dictionary = {}  # peer_id -> player_node
+
+func register_player(peer_id: int, player_node: Node) -> void:
+	registered_players[peer_id] = player_node
+	print("[GameManager] Registered player %d" % peer_id)
+
+func unregister_player(peer_id: int) -> void:
+	if peer_id in registered_players:
+		registered_players.erase(peer_id)
+		print("[GameManager] Unregistered player %d" % peer_id)

@@ -1,5 +1,4 @@
 extends Node
-class_name ZombieTextureGenerator
 ## Generates procedural pixel art textures for different zombie types
 ## Copied from Zombies-vs-Humans for consistent art style
 

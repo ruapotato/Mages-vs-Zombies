@@ -2,7 +2,7 @@ extends CharacterBody3D
 class_name BillboardZombie
 ## Paper Mario style 2D billboard zombie - extremely fast to render
 
-const ZombieTextureGen = preload("res://scripts/enemies/zombie_texture_generator.gd")
+# Use the autoloaded ZombieTextureGenerator
 
 signal died(enemy: Node3D, killer_id: int, is_headshot: bool)
 signal damaged(amount: int, is_headshot: bool)
@@ -69,7 +69,7 @@ func _ready() -> void:
 
 	# Set zombie texture based on type
 	if sprite:
-		sprite.texture = ZombieTextureGen.get_zombie_texture(enemy_type)
+		sprite.texture = ZombieTextureGenerator.get_zombie_texture(enemy_type)
 		# Tank is bigger
 		if enemy_type == "tank":
 			sprite.pixel_size = 0.03
@@ -176,11 +176,14 @@ func set_horde_controlled(controlled: bool) -> void:
 
 
 func _scale_stats_for_round() -> void:
-	var round_num := GameManager.current_round
-	max_health = int(GameManager.get_zombie_health_for_round(base_health))
+	# Use difficulty scaling from day number
+	var difficulty_scale := 1.0
+	if GameManager:
+		difficulty_scale = GameManager.get_difficulty_scale()
+	max_health = int(base_health * difficulty_scale * GameManager.get_zombie_health_multiplier() if GameManager else base_health)
 	health = max_health
-	damage = int(GameManager.get_zombie_damage_for_round(base_damage))
-	speed = base_speed + (round_num * 0.1)
+	damage = int(base_damage * difficulty_scale * GameManager.get_zombie_damage_multiplier() if GameManager else base_damage)
+	speed = base_speed * (GameManager.get_zombie_speed_multiplier() if GameManager else 1.0)
 	speed = min(speed, base_speed * 1.5)
 
 
@@ -305,7 +308,7 @@ func _perform_attack() -> void:
 
 	if attack_target and attack_target.has_method("take_damage"):
 		attack_target.take_damage(damage, self)
-		AudioManager.play_sound_3d("zombie_attack", global_position)
+		# AudioManager.play_sound_3d("zombie_attack", global_position)  # TODO: Add AudioManager
 		return
 
 	# Second priority: attack barriers
@@ -313,7 +316,7 @@ func _perform_attack() -> void:
 		if is_instance_valid(barrier) and barrier.has_method("break_board"):
 			if not barrier.is_broken():
 				barrier.break_board()
-				AudioManager.play_sound_3d("zombie_attack", global_position)
+				# AudioManager.play_sound_3d("zombie_attack", global_position)  # TODO: Add AudioManager
 				return
 
 
@@ -331,7 +334,7 @@ func take_damage(amount: int, attacker: Node = null, is_headshot: bool = false, 
 		last_attacker_id = attacker.player_id
 
 	damaged.emit(final_damage, is_headshot)
-	AudioManager.play_sound_3d("zombie_hurt", global_position, -5.0)
+	# AudioManager.play_sound_3d("zombie_hurt", global_position, -5.0)  # TODO: Add AudioManager
 	_update_health_bar()
 
 	# Flash white on hit
@@ -362,13 +365,13 @@ func die() -> void:
 	collision_layer = 0
 	collision_mask = 0
 
-	if last_hit_was_headshot:
-		AudioManager.play_sound_3d("headshot_kill", global_position, 3.0)
-	else:
-		AudioManager.play_sound_3d("zombie_death", global_position)
+	# if last_hit_was_headshot:
+	# 	AudioManager.play_sound_3d("headshot_kill", global_position, 3.0)  # TODO: Add AudioManager
+	# else:
+	# 	AudioManager.play_sound_3d("zombie_death", global_position)  # TODO: Add AudioManager
 
-	if multiplayer.is_server():
-		GameManager.on_zombie_killed(self, last_attacker_id, last_hit_was_headshot, last_hit_position)
+	if multiplayer.is_server() and GameManager:
+		GameManager.on_zombie_killed(enemy_type, global_position)
 
 	died.emit(self, last_attacker_id, last_hit_was_headshot)
 

@@ -113,8 +113,7 @@ func try_cast() -> bool:
 
 	if current_mana < mana_cost:
 		# Not enough mana
-		if owner_player:
-			AudioManager.play_sound_3d("no_mana", global_position, -5.0)
+		# TODO: Add AudioManager for "no_mana" sound
 		return false
 
 	if not owner_player:
@@ -199,8 +198,8 @@ func _play_cast_start_effects() -> void:
 	if not spell_data:
 		return
 
-	# Sound
-	AudioManager.play_sound_3d(spell_data.cast_sound, global_position, 0.0)
+	# TODO: Add AudioManager for cast sounds
+	# AudioManager.play_sound_3d(spell_data.cast_sound, global_position, 0.0)
 
 	# Cast light
 	if cast_light:

@@ -317,9 +317,9 @@ func _spawn_explosion_effect() -> void:
 	tween.parallel().tween_property(material, "albedo_color:a", 0.0, 0.3)
 	tween.tween_callback(explosion.queue_free)
 
-	# Play explosion sound
-	if owner_spell and owner_spell.spell_data:
-		AudioManager.play_sound_3d(owner_spell.spell_data.impact_sound, global_position, 0.0)
+	# TODO: Add AudioManager for explosion sound
+	# if owner_spell and owner_spell.spell_data:
+	# 	AudioManager.play_sound_3d(owner_spell.spell_data.impact_sound, global_position, 0.0)
 
 
 func _on_lifetime_expired() -> void:
