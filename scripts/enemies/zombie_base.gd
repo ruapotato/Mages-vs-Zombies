@@ -161,6 +161,16 @@ func _physics_process(delta: float) -> void:
 		State.DEAD:
 			pass  # Do nothing when dead
 
+	# If stuck in ground (floor collisions happening but we're not stable), push up
+	if is_on_floor() and get_slide_collision_count() > 0:
+		for i in range(get_slide_collision_count()):
+			var collision = get_slide_collision(i)
+			if collision:
+				var normal = collision.get_normal()
+				# If colliding from below (normal pointing up), we might be embedded
+				if normal.y > 0.7 and velocity.y < 0:
+					velocity.y = 0  # Stop falling, we hit ground
+
 	# Apply gravity when not on floor
 	if not is_on_floor() and current_state != State.DEAD:
 		velocity.y -= gravity * delta
@@ -188,32 +198,40 @@ func _process_spawning(delta: float) -> void:
 	if spawn_progress >= 1.0:
 		scale = Vector3.ONE
 		current_state = State.IDLE
-		print("[Zombie] Spawn complete, now IDLE at %v" % global_position)
+		print("[Zombie] Spawn complete at Y=%.2f, is_on_floor=%s, has_target=%s" % [global_position.y, is_on_floor(), target_player != null])
+
+var _idle_search_timer: float = 0.0
 
 func _process_idle(delta: float) -> void:
 	# Simplified AI for distant zombies (LOD)
 	if lod_level >= 2:
 		return
 
-	# If no target, actively search for players
-	if not target_player or not is_instance_valid(target_player):
-		var players = get_tree().get_nodes_in_group("player")
-		if players.size() > 0:
-			# Find closest player
-			var closest_dist := INF
-			for p in players:
-				var dist := global_position.distance_to(p.global_position)
-				if dist < closest_dist:
-					closest_dist = dist
-					target_player = p
-			print("[Zombie] Found player target at distance %.1f" % closest_dist)
+	# Throttle player search to once per second
+	_idle_search_timer += delta
+	if _idle_search_timer >= 1.0:
+		_idle_search_timer = 0.0
+
+		# If no target, actively search for players
+		if not target_player or not is_instance_valid(target_player):
+			var players = get_tree().get_nodes_in_group("player")
+			print("[Zombie] Searching for players, found %d in group" % players.size())
+			if players.size() > 0:
+				# Find closest player
+				var closest_dist := INF
+				for p in players:
+					var dist := global_position.distance_to(p.global_position)
+					if dist < closest_dist:
+						closest_dist = dist
+						target_player = p
+				print("[Zombie] Target set to player at distance %.1f" % closest_dist)
 
 	# Look for player and start chasing
 	if target_player and is_instance_valid(target_player):
 		var distance = global_position.distance_to(target_player.global_position)
 		if distance <= detection_range:
 			current_state = State.CHASING
-			print("[Zombie] Starting to chase player!")
+			print("[Zombie] Starting to chase! Distance=%.1f, detection_range=%.1f" % [distance, detection_range])
 
 	# Slight idle bob
 	animation_time += delta * 2.0
@@ -236,24 +254,16 @@ func _process_chasing(delta: float) -> void:
 		current_state = State.ATTACKING
 		return
 
-	# LOD: Skip pathfinding for very distant zombies
-	if lod_level >= 2:
-		# Simple direct movement for distant zombies
-		var direction = (target_player.global_position - global_position).normalized()
+	# Simple direct movement toward player (no navmesh required)
+	var direction = (target_player.global_position - global_position)
+	direction.y = 0  # Only move horizontally
+	if direction.length() > 0.1:
+		direction = direction.normalized()
 		velocity.x = direction.x * current_speed
 		velocity.z = direction.z * current_speed
 	else:
-		# Full pathfinding for close zombies
-		navigation_agent.target_position = target_player.global_position
-
-		if navigation_agent.is_navigation_finished():
-			velocity.x = 0
-			velocity.z = 0
-		else:
-			var next_position = navigation_agent.get_next_path_position()
-			var direction = (next_position - global_position).normalized()
-			velocity.x = direction.x * current_speed
-			velocity.z = direction.z * current_speed
+		velocity.x = 0
+		velocity.z = 0
 
 	# Rotate to face movement direction
 	if velocity.length() > 0.1:
