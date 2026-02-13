@@ -36,6 +36,13 @@ const TREE_COLORS := {
 	"dead": {"trunk": Color(0.3, 0.25, 0.2), "leaves": Color(0.4, 0.35, 0.3)},
 	"magic": {"trunk": Color(0.3, 0.2, 0.4), "leaves": Color(0.5, 0.3, 0.7)},
 	"swamp": {"trunk": Color(0.25, 0.3, 0.2), "leaves": Color(0.3, 0.4, 0.25)},
+	# Biome-specific trees
+	"cactus": {"trunk": Color(0.3, 0.55, 0.25), "leaves": Color(0.35, 0.6, 0.3)},  # Desert
+	"palm": {"trunk": Color(0.5, 0.4, 0.25), "leaves": Color(0.25, 0.5, 0.2)},  # Desert
+	"frost_pine": {"trunk": Color(0.45, 0.5, 0.55), "leaves": Color(0.85, 0.9, 0.95)},  # Mountain
+	"crystal_tree": {"trunk": Color(0.4, 0.3, 0.5), "leaves": Color(0.9, 0.4, 1.0)},  # Wizardland
+	"ember_tree": {"trunk": Color(0.15, 0.08, 0.05), "leaves": Color(0.9, 0.3, 0.1)},  # Hell
+	"dark_oak": {"trunk": Color(0.15, 0.12, 0.1), "leaves": Color(0.05, 0.15, 0.1)},  # Dark Forest
 }
 
 func _ready() -> void:
@@ -481,6 +488,18 @@ func generate_tree_texture(tree_type: String = "oak") -> ImageTexture:
 			_draw_magic_tree(img, cx, by, trunk_color, leaves_color)
 		"swamp":
 			_draw_swamp_tree(img, cx, by, trunk_color, leaves_color)
+		"cactus":
+			_draw_cactus(img, cx, by, trunk_color)
+		"palm":
+			_draw_palm_tree(img, cx, by, trunk_color, leaves_color)
+		"frost_pine":
+			_draw_frost_pine(img, cx, by, trunk_color, leaves_color)
+		"crystal_tree":
+			_draw_crystal_tree(img, cx, by, trunk_color, leaves_color)
+		"ember_tree":
+			_draw_ember_tree(img, cx, by, trunk_color, leaves_color)
+		"dark_oak":
+			_draw_dark_oak(img, cx, by, trunk_color, leaves_color)
 		_:
 			_draw_oak_tree(img, cx, by, trunk_color, leaves_color)
 
@@ -614,6 +633,196 @@ func _draw_swamp_tree(img: Image, cx: int, by: int, trunk: Color, leaves: Color)
 			for y in range(by - 55, by - 55 + hang_length):
 				if x >= 0 and x < 64 and y >= 0 and y < 128:
 					img.set_pixel(x, y, Color(0.35, 0.4, 0.3, 0.8))
+
+func _draw_cactus(img: Image, cx: int, by: int, trunk: Color) -> void:
+	# Main cactus body
+	for y in range(by - 70, by):
+		var width: int = 6 - int(abs(y - (by - 35)) * 0.03)
+		width = max(4, width)
+		for dx in range(-width, width + 1):
+			var px := cx + dx
+			if px >= 0 and px < 64:
+				var shade: float = 0.8 + randf() * 0.2
+				img.set_pixel(px, y, trunk * shade)
+
+	# Left arm
+	var arm_y := by - 50
+	for i in range(15):
+		var px := cx - 8 - int(i * 0.3)
+		var py := arm_y - i
+		for dx in range(-3, 4):
+			if px + dx >= 0 and px + dx < 64 and py >= 0:
+				img.set_pixel(px + dx, py, trunk * (0.85 + randf() * 0.15))
+	# Left arm vertical part
+	for i in range(20):
+		var px := cx - 12
+		var py := arm_y - 15 + i
+		for dx in range(-3, 4):
+			if px + dx >= 0 and px + dx < 64 and py >= 0:
+				img.set_pixel(px + dx, py, trunk * (0.85 + randf() * 0.15))
+
+	# Right arm
+	arm_y = by - 40
+	for i in range(12):
+		var px := cx + 8 + int(i * 0.2)
+		var py := arm_y - i
+		for dx in range(-3, 4):
+			if px + dx >= 0 and px + dx < 64 and py >= 0:
+				img.set_pixel(px + dx, py, trunk * (0.85 + randf() * 0.15))
+	# Right arm vertical
+	for i in range(25):
+		var px := cx + 10
+		var py := arm_y - 12 + i
+		for dx in range(-3, 4):
+			if px + dx >= 0 and px + dx < 64 and py >= 0 and py < 128:
+				img.set_pixel(px + dx, py, trunk * (0.85 + randf() * 0.15))
+
+func _draw_palm_tree(img: Image, cx: int, by: int, trunk: Color, leaves: Color) -> void:
+	# Curved trunk
+	for y in range(by - 80, by):
+		var curve: int = int(sin((y - (by - 80)) * 0.03) * 8)
+		var width: int = 3 + int((by - y) * 0.015)
+		for dx in range(-width, width + 1):
+			var px := cx + dx + curve
+			if px >= 0 and px < 64:
+				var ring: float = 0.85 + (sin(y * 0.5) * 0.1)
+				img.set_pixel(px, y, trunk * ring)
+
+	# Palm fronds (radiating leaves)
+	var frond_base_x := cx + int(sin((by - 80 - (by - 80)) * 0.03) * 8)
+	var frond_base_y := by - 85
+	for frond in range(7):
+		var angle := (frond - 3) * 0.5
+		for i in range(35):
+			var droop: float = i * i * 0.008
+			var fx := frond_base_x + int(cos(angle) * i * 1.5)
+			var fy := frond_base_y + int(sin(angle) * i * 0.5 + droop)
+			var width: int = max(1, 4 - i / 10)
+			for dx in range(-width, width + 1):
+				if fx + dx >= 0 and fx + dx < 64 and fy >= 0 and fy < 128:
+					img.set_pixel(fx + dx, fy, leaves * (0.7 + randf() * 0.3))
+
+func _draw_frost_pine(img: Image, cx: int, by: int, trunk: Color, leaves: Color) -> void:
+	# Icy trunk
+	for y in range(by - 30, by):
+		for dx in range(-2, 3):
+			var px := cx + dx
+			if px >= 0 and px < 64:
+				var ice: Color = trunk.lerp(Color(0.9, 0.95, 1.0), randf() * 0.3)
+				img.set_pixel(px, y, ice)
+
+	# Snow-covered pine layers
+	for layer in range(5):
+		var layer_y: int = by - 40 - layer * 18
+		var layer_width: int = 22 - layer * 3
+		for y in range(layer_y, layer_y + 20):
+			var progress: float = (y - layer_y) / 20.0
+			var width: int = int(layer_width * (1.0 - progress))
+			for dx in range(-width, width + 1):
+				var px := cx + dx
+				if px >= 0 and px < 64 and y >= 0 and y < 128:
+					# Snow on top, darker underneath
+					var snow_amount: float = 1.0 - progress * 0.7
+					var color: Color = leaves.lerp(Color(1, 1, 1), snow_amount * 0.6)
+					img.set_pixel(px, y, color * (0.85 + randf() * 0.15))
+
+	# Snow cap
+	for dy in range(-8, 0):
+		var width: int = 3 - abs(dy) / 3
+		for dx in range(-width, width + 1):
+			var px := cx + dx
+			var py := by - 125 + dy
+			if px >= 0 and px < 64 and py >= 0:
+				img.set_pixel(px, py, Color(1, 1, 1))
+
+func _draw_crystal_tree(img: Image, cx: int, by: int, trunk: Color, leaves: Color) -> void:
+	# Crystalline trunk
+	for y in range(by - 50, by):
+		var width: int = 3 + int((by - y) * 0.02)
+		for dx in range(-width, width + 1):
+			var px := cx + dx
+			if px >= 0 and px < 64:
+				var sparkle: Color = trunk.lerp(Color(1, 0.8, 1), randf() * 0.4)
+				img.set_pixel(px, y, sparkle)
+
+	# Magical crystal canopy with intense glow
+	for dy in range(-60, 5):
+		for dx in range(-20, 21):
+			if dx * dx + dy * dy < 380 + randf() * 120:
+				var px := cx + dx
+				var py := by - 75 + dy
+				if px >= 0 and px < 64 and py >= 0 and py < 128:
+					var is_sparkle: bool = randf() < 0.15
+					var is_bright: bool = randf() < 0.1
+					var color: Color
+					if is_bright:
+						color = Color(1, 1, 1)  # Bright white sparkle
+					elif is_sparkle:
+						color = Color(1, 0.7, 1.0)  # Pink sparkle
+					else:
+						color = leaves * (0.8 + randf() * 0.4)
+					img.set_pixel(px, py, color)
+
+func _draw_ember_tree(img: Image, cx: int, by: int, trunk: Color, leaves: Color) -> void:
+	# Charred trunk with glowing cracks
+	for y in range(by - 70, by):
+		var width: int = 4 + int((by - y) * 0.025)
+		for dx in range(-width, width + 1):
+			var px := cx + dx
+			if px >= 0 and px < 64:
+				var is_ember: bool = randf() < 0.1
+				var color: Color
+				if is_ember:
+					color = Color(1, 0.4, 0.1)  # Glowing ember
+				else:
+					color = trunk * (0.7 + randf() * 0.2)
+				img.set_pixel(px, y, color)
+
+	# Flame-like canopy
+	for dy in range(-45, 15):
+		for dx in range(-18, 19):
+			var dist: float = sqrt(dx * dx + dy * dy)
+			if dist < 22 + randf() * 8:
+				var px := cx + dx
+				var py := by - 80 + dy
+				if px >= 0 and px < 64 and py >= 0 and py < 128:
+					var flame_t: float = dist / 25.0
+					var color: Color = Color(1, 0.9, 0.3).lerp(leaves, flame_t)
+					if randf() < 0.2:
+						color = Color(1, 0.5, 0.1)  # Hot spots
+					img.set_pixel(px, py, color * (0.7 + randf() * 0.3))
+
+func _draw_dark_oak(img: Image, cx: int, by: int, trunk: Color, leaves: Color) -> void:
+	# Very dark twisted trunk
+	for y in range(by - 60, by):
+		var twist: int = int(sin(y * 0.08) * 5)
+		var width: int = 5 + int((by - y) * 0.03)
+		for dx in range(-width, width + 1):
+			var px := cx + dx + twist
+			if px >= 0 and px < 64:
+				img.set_pixel(px, y, trunk * (0.6 + randf() * 0.3))
+
+	# Very dark, dense canopy
+	var centers := [Vector2i(cx, by - 75), Vector2i(cx - 14, by - 60), Vector2i(cx + 14, by - 60)]
+	for center in centers:
+		for dy in range(-30, 25):
+			for dx in range(-22, 23):
+				if dx * dx + dy * dy < 450 + randf() * 150:
+					var px: int = center.x + dx
+					var py: int = center.y + dy
+					if px >= 0 and px < 64 and py >= 0 and py < 128:
+						var existing: Color = img.get_pixel(px, py)
+						if existing.a < 0.5:
+							# Very dark green, almost black
+							var shade: float = 0.5 + randf() * 0.4
+							img.set_pixel(px, py, leaves * shade)
+
+	# Occasional glowing eye or mushroom
+	if randf() < 0.3:
+		var eye_x := cx + randi_range(-10, 10)
+		var eye_y := by - 50 + randi_range(-10, 10)
+		if eye_x >= 0 and eye_x < 64 and eye_y >= 0 and eye_y < 128:
+			img.set_pixel(eye_x, eye_y, Color(0.3, 1, 0.4))
 
 # ============================================
 # SPELL EFFECT TEXTURES

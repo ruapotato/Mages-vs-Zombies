@@ -52,6 +52,18 @@ const MAX_ANIMATED_ZOMBIES := 400  # Billboard animation is very cheap
 @export var mage_probability: float = 0.07  # 7%
 @export var exploder_probability: float = 0.03  # 3%
 
+# Biome-specific zombie type weights (overrides base probabilities)
+# Higher weight = more likely in that biome
+const BIOME_ZOMBIE_WEIGHTS: Dictionary = {
+	"valley": {"walker": 1.5, "runner": 1.0, "brute": 0.5, "mage": 0.3, "exploder": 0.2},
+	"dark_forest": {"walker": 1.0, "runner": 0.5, "brute": 0.8, "mage": 1.5, "exploder": 0.5},  # More mage zombies in dark forest
+	"swamp": {"walker": 1.2, "runner": 0.3, "brute": 1.2, "mage": 0.8, "exploder": 1.5},  # Exploders thrive in swamp
+	"mountain": {"walker": 0.8, "runner": 1.5, "brute": 1.5, "mage": 0.5, "exploder": 0.3},  # Fast runners and strong brutes
+	"desert": {"walker": 1.3, "runner": 1.5, "brute": 0.8, "mage": 0.4, "exploder": 0.5},  # Fast runners in desert
+	"wizardland": {"walker": 0.5, "runner": 0.5, "brute": 0.5, "mage": 2.5, "exploder": 0.8},  # LOTS of mage zombies
+	"hell": {"walker": 0.5, "runner": 1.2, "brute": 1.8, "mage": 1.2, "exploder": 2.0},  # Brutal: brutes and exploders
+}
+
 # Internal state
 var all_zombies: Array[Node3D] = []
 var zombie_data: Dictionary = {}  # zombie -> {target, path_timer, sync_timer, etc}
@@ -319,32 +331,58 @@ func _create_zombie(zombie_type: String):  # -> ZombieBase
 	return zombie
 
 func _roll_zombie_type() -> String:
-	var roll = randf()
-	var cumulative = 0.0
+	# Get current biome at spawn location to influence zombie type
+	var biome := _get_spawn_biome()
+	var weights: Dictionary = BIOME_ZOMBIE_WEIGHTS.get(biome, BIOME_ZOMBIE_WEIGHTS["valley"])
+
+	# Calculate weighted probabilities
+	var walker_w := walker_probability * weights.get("walker", 1.0)
+	var runner_w := runner_probability * weights.get("runner", 1.0)
+	var brute_w := brute_probability * weights.get("brute", 1.0)
+	var mage_w := mage_probability * weights.get("mage", 1.0)
+	var exploder_w := exploder_probability * weights.get("exploder", 1.0)
+
+	var total := walker_w + runner_w + brute_w + mage_w + exploder_w
+	var roll := randf() * total
+	var cumulative := 0.0
 
 	# Check each type in order
-	cumulative += walker_probability
+	cumulative += walker_w
 	if roll < cumulative:
 		return "walker"
 
-	cumulative += runner_probability
+	cumulative += runner_w
 	if roll < cumulative:
 		return "runner"
 
-	cumulative += brute_probability
+	cumulative += brute_w
 	if roll < cumulative:
 		return "brute"
 
-	cumulative += mage_probability
+	cumulative += mage_w
 	if roll < cumulative:
 		return "mage"
 
-	cumulative += exploder_probability
+	cumulative += exploder_w
 	if roll < cumulative:
 		return "exploder"
 
 	# Fallback to walker
 	return "walker"
+
+
+func _get_spawn_biome() -> String:
+	if not player:
+		return "valley"
+
+	# Get biome at player position
+	var terrain_nodes = get_tree().get_nodes_in_group("terrain_world")
+	if terrain_nodes.size() > 0:
+		var terrain = terrain_nodes[0]
+		if terrain.has_method("get_biome_at"):
+			return terrain.get_biome_at(Vector2(player.global_position.x, player.global_position.z))
+
+	return "valley"
 
 func _get_random_spawn_position() -> Vector3:
 	if not player:

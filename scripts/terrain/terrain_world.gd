@@ -74,12 +74,22 @@ func _ready() -> void:
 
 
 func _setup_terrain_material() -> void:
-	# Create default material - green grass
-	var mat = StandardMaterial3D.new()
-	mat.albedo_color = Color(0.35, 0.55, 0.25)  # Green grass color
-	mat.roughness = 0.9
-	terrain_material = mat
-	print("[TerrainWorld] Using default terrain material")
+	# Load terrain shader with biome colors and slope detection
+	var shader_path = "res://shaders/terrain_material.gdshader"
+	if ResourceLoader.exists(shader_path):
+		var shader = load(shader_path)
+		var mat = ShaderMaterial.new()
+		mat.shader = shader
+		mat.set_shader_parameter("world_seed", world_seed)
+		terrain_material = mat
+		print("[TerrainWorld] Using terrain shader material (seed: %d)" % world_seed)
+	else:
+		# Fallback to simple material
+		var mat = StandardMaterial3D.new()
+		mat.albedo_color = Color(0.35, 0.55, 0.25)
+		mat.roughness = 0.9
+		terrain_material = mat
+		print("[TerrainWorld] Using fallback terrain material")
 
 
 func _process(delta: float) -> void:
@@ -517,6 +527,26 @@ func get_terrain_height(xz_pos: Vector2) -> float:
 	if biome_generator:
 		return biome_generator.get_height_at_position(xz_pos)
 	return 0.0
+
+
+## Get biome at position
+func get_biome_at(xz_pos: Vector2) -> String:
+	if biome_generator:
+		return biome_generator.get_biome_at_position(xz_pos)
+	return "valley"
+
+
+## Get biome index for shader
+func _get_biome_index(biome_name: String) -> int:
+	match biome_name:
+		"valley": return 0
+		"dark_forest": return 1
+		"swamp": return 2
+		"mountain": return 3
+		"desert": return 4
+		"wizardland": return 5
+		"hell": return 6
+		_: return 0
 
 
 ## Check if collision is ready at position

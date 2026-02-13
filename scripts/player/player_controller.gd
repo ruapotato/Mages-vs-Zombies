@@ -30,25 +30,29 @@ class_name PlayerController
 @export var mouse_sensitivity := 0.002
 @export var vertical_look_limit := 89.0  # degrees
 
+# ADS (Aim Down Sights) zoom
+const DEFAULT_FOV := 75.0
+const ADS_FOV := 45.0
+const ADS_ZOOM_SPEED := 12.0
+const ADS_SENSITIVITY_MULTIPLIER := 0.5  # Half sensitivity when aiming
+
 # Combat parameters
 @export_group("Combat")
 @export var max_health := 100.0
-@export var health_regen_rate := 50.0  # HP per second
-@export var health_regen_delay := 2.0  # Seconds after damage before regen
 @export var max_mana := 100.0
 @export var mana_regen_rate := 10.0  # Mana per second
 
-# Spell slots
+# Spell slots (1=fireball, 2=frost nova AOE, 3=lightning, 4=heal, 5=flame wave AOE)
 @export_group("Spells")
-@export var spell_slots: Array[String] = ["fireball", "ice_spike", "lightning", "heal", "shield"]
-@export var spell_cooldowns: Array[float] = [1.0, 1.5, 2.0, 10.0, 8.0]
-@export var spell_mana_costs: Array[int] = [15, 20, 25, 30, 20]
+@export var spell_slots: Array[String] = ["fireball", "frost_nova", "lightning", "heal", "flame_wave"]
+@export var spell_cooldowns: Array[float] = [0.5, 2.5, 2.0, 8.0, 3.0]
+@export var spell_mana_costs: Array[int] = [15, 25, 25, 35, 30]
 
 # State
 var current_health: float
 var current_mana: float
-var time_since_damage := 0.0
 var is_sprinting := false
+var is_aiming := false
 var has_double_jumped := false
 var build_mode := false
 
@@ -134,8 +138,13 @@ func _update_arm_spell_color() -> void:
 func _input(event: InputEvent) -> void:
 	# Mouse look - first person style
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		yaw -= event.relative.x * mouse_sensitivity
-		pitch -= event.relative.y * mouse_sensitivity
+		# Reduce sensitivity when aiming
+		var sensitivity := mouse_sensitivity
+		if is_aiming:
+			sensitivity *= ADS_SENSITIVITY_MULTIPLIER
+
+		yaw -= event.relative.x * sensitivity
+		pitch -= event.relative.y * sensitivity
 		pitch = clamp(pitch, deg_to_rad(-vertical_look_limit), deg_to_rad(vertical_look_limit))
 
 		# Apply rotation immediately
@@ -151,7 +160,6 @@ func _input(event: InputEvent) -> void:
 
 func _physics_process(delta: float) -> void:
 	# Update timers
-	time_since_damage += delta
 	_update_cooldowns(delta)
 
 	# Handle input
@@ -166,8 +174,13 @@ func _physics_process(delta: float) -> void:
 	# Movement
 	_handle_movement(delta)
 
-	# Regeneration
+	# Mana regeneration only (no health regen)
 	_handle_regeneration(delta)
+
+	# Handle ADS FOV zoom
+	if camera:
+		var target_fov := ADS_FOV if is_aiming else DEFAULT_FOV
+		camera.fov = lerpf(camera.fov, target_fov, ADS_ZOOM_SPEED * delta)
 
 	# Move
 	move_and_slide()
@@ -188,19 +201,24 @@ func _handle_input(_delta: float) -> void:
 			velocity.y = double_jump_velocity
 			has_double_jumped = true
 
-	# Spell casting - left click for primary spell
-	if Input.is_action_just_pressed("cast_spell") or Input.is_action_just_pressed("spell_1"):
-		_cast_spell(0)
-
-	# Number keys for other spells
-	for i in range(1, 5):
+	# Number keys to SELECT spell (1-5)
+	for i in range(5):
 		if Input.is_action_just_pressed("spell_" + str(i + 1)):
-			_cast_spell(i)
+			current_spell_slot = i
+			_update_arm_spell_color()
+			print("Selected spell: %s" % spell_slots[i])
+
+	# Left click casts the currently selected spell
+	if Input.is_action_just_pressed("cast_spell"):
+		_cast_spell(current_spell_slot)
 
 	# Build mode toggle
 	if Input.is_action_just_pressed("build_mode"):
 		build_mode = not build_mode
 		print("Build mode: ", "ON" if build_mode else "OFF")
+
+	# Aiming (ADS) - right mouse button
+	is_aiming = Input.is_action_pressed("aim") and not is_sprinting
 
 
 func _handle_movement(delta: float) -> void:
@@ -221,11 +239,7 @@ func _handle_movement(delta: float) -> void:
 
 
 func _handle_regeneration(delta: float) -> void:
-	# Health regeneration (CoD style - fast regen after delay)
-	if time_since_damage >= health_regen_delay and current_health < max_health:
-		current_health = min(current_health + health_regen_rate * delta, max_health)
-
-	# Mana regeneration
+	# Mana regeneration only - no automatic health regen
 	if current_mana < max_mana:
 		current_mana = min(current_mana + mana_regen_rate * delta, max_mana)
 
@@ -269,40 +283,155 @@ func _spawn_spell_effect(spell_name: String) -> void:
 	var camera_forward := -camera.global_transform.basis.z if camera else -global_transform.basis.z
 	var spawn_position := global_position + Vector3(0, 1.5, 0) + camera_forward * 1.0
 
-	# Map spell names to scene paths
-	var spell_scenes := {
-		"fireball": "res://scripts/projectiles/fireball.tscn",
-		"ice_spike": "res://scripts/projectiles/fireball.tscn",
-		"lightning": "res://scripts/projectiles/fireball.tscn",
-		"heal": "",
-		"shield": "",
-	}
+	match spell_name:
+		"fireball", "lightning":
+			# Projectile spells
+			_spawn_projectile(spawn_position, camera_forward, spell_name)
 
-	var scene_path: String = spell_scenes.get(spell_name, "")
-	if scene_path == "":
-		# Self-cast spells
-		if spell_name == "heal":
-			heal(25.0)
-		return
+		"frost_nova":
+			# AOE centered on player - freeze/slow nearby enemies
+			_cast_frost_nova()
 
-	# Load and instantiate projectile
+		"flame_wave":
+			# AOE centered on player - fire damage
+			_cast_flame_wave()
+
+		"heal":
+			# Self heal
+			heal(40.0)
+			_create_heal_effect()
+
+
+func _spawn_projectile(spawn_pos: Vector3, direction: Vector3, spell_name: String) -> void:
+	var scene_path := "res://scripts/projectiles/fireball.tscn"
+
 	if ResourceLoader.exists(scene_path):
 		var spell_scene = load(scene_path)
 		var spell_instance = spell_scene.instantiate()
 		get_tree().current_scene.add_child(spell_instance)
-		spell_instance.global_position = spawn_position
+		spell_instance.global_position = spawn_pos
+
+		# Modify based on spell type
+		if spell_name == "lightning":
+			if "damage" in spell_instance:
+				spell_instance.damage = 35.0
+			if "speed" in spell_instance:
+				spell_instance.speed = 50.0
 
 		if spell_instance.has_method("setup_simple"):
-			spell_instance.setup_simple(camera_forward, self)
+			spell_instance.setup_simple(direction, self)
 		elif "velocity" in spell_instance:
-			spell_instance.velocity = camera_forward * 25.0
+			spell_instance.velocity = direction * 25.0
+
+
+func _cast_frost_nova() -> void:
+	# AOE damage and slow around player
+	var aoe_radius := 8.0
+	var damage := 30.0
+
+	# Find enemies in range
+	var enemies := get_tree().get_nodes_in_group("enemies")
+	for enemy in enemies:
+		if not is_instance_valid(enemy):
+			continue
+		var dist := global_position.distance_to(enemy.global_position)
+		if dist <= aoe_radius:
+			if enemy.has_method("take_damage"):
+				enemy.take_damage(damage, self)
+			# Could add slow effect here
+
+	# Visual effect
+	_create_aoe_effect(Color(0.4, 0.8, 1.0, 0.8), aoe_radius)
+
+
+func _cast_flame_wave() -> void:
+	# AOE fire damage around player
+	var aoe_radius := 6.0
+	var damage := 45.0
+
+	# Find enemies in range
+	var enemies := get_tree().get_nodes_in_group("enemies")
+	for enemy in enemies:
+		if not is_instance_valid(enemy):
+			continue
+		var dist := global_position.distance_to(enemy.global_position)
+		if dist <= aoe_radius:
+			if enemy.has_method("take_damage"):
+				enemy.take_damage(damage, self)
+
+	# Visual effect
+	_create_aoe_effect(Color(1.0, 0.4, 0.1, 0.8), aoe_radius)
+
+
+func _create_aoe_effect(color: Color, radius: float) -> void:
+	# Create expanding ring effect
+	var effect := MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = radius - 0.3
+	torus.outer_radius = radius
+	torus.rings = 32
+	torus.ring_segments = 16
+	effect.mesh = torus
+
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.emission_enabled = true
+	material.emission = color
+	material.emission_energy_multiplier = 3.0
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	effect.material_override = material
+
+	get_tree().current_scene.add_child(effect)
+	effect.global_position = global_position + Vector3(0, 0.1, 0)
+	effect.rotation.x = PI / 2.0
+
+	# Animate expansion and fade
+	var tween := create_tween()
+	tween.tween_property(effect, "scale", Vector3.ONE * 1.5, 0.3)
+	tween.parallel().tween_property(material, "albedo_color:a", 0.0, 0.4)
+	tween.tween_callback(effect.queue_free)
+
+	# Add light flash
+	var light := OmniLight3D.new()
+	light.light_color = color
+	light.light_energy = 4.0
+	light.omni_range = radius * 1.5
+	effect.add_child(light)
+
+	var light_tween := create_tween()
+	light_tween.tween_property(light, "light_energy", 0.0, 0.3)
+
+
+func _create_heal_effect() -> void:
+	# Green healing particles around player
+	var effect := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = 1.0
+	sphere.height = 2.0
+	effect.mesh = sphere
+
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.2, 1.0, 0.3, 0.5)
+	material.emission_enabled = true
+	material.emission = Color(0.3, 1.0, 0.4)
+	material.emission_energy_multiplier = 2.0
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	effect.material_override = material
+
+	get_tree().current_scene.add_child(effect)
+	effect.global_position = global_position + Vector3(0, 1.0, 0)
+
+	# Animate rise and fade
+	var tween := create_tween()
+	tween.tween_property(effect, "global_position:y", global_position.y + 2.5, 0.5)
+	tween.parallel().tween_property(material, "albedo_color:a", 0.0, 0.6)
+	tween.tween_callback(effect.queue_free)
 
 
 ## Take damage from zombie
 func take_damage(amount: float, _attacker: Node = null) -> void:
 	current_health -= amount
 	current_health = max(current_health, 0)
-	time_since_damage = 0.0
 
 	# Flash HUD red
 	var huds = get_tree().get_nodes_in_group("game_hud")

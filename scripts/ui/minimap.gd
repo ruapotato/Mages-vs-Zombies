@@ -81,13 +81,24 @@ func _find_biome_generator() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	# Right-click to toggle zoom
-	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-			# Check if mouse is over minimap
-			var local_pos = get_local_mouse_position()
-			if Rect2(Vector2.ZERO, size).has_point(local_pos):
-				_toggle_zoom()
+	# M key to toggle minimap zoom
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_M:
+			_toggle_zoom()
+			get_viewport().set_input_as_handled()
+
+	# Mouse wheel over minimap to zoom (when mouse is visible)
+	if event is InputEventMouseButton and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE:
+		var local_pos = get_local_mouse_position()
+		if Rect2(Vector2.ZERO, size).has_point(local_pos):
+			if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
+				if not is_zoomed:
+					_toggle_zoom()
+				get_viewport().set_input_as_handled()
+			elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
+				if is_zoomed:
+					_toggle_zoom()
+				get_viewport().set_input_as_handled()
 
 
 func _toggle_zoom() -> void:
@@ -156,18 +167,20 @@ func _regenerate_buffer(center: Vector2) -> void:
 
 func _draw() -> void:
 	var center := size / 2.0
-	var radius := size.x / 2.0 - 5.0
+	var half_size := size.x / 2.0 - 4.0
 
-	# Draw background circle
-	draw_circle(center, radius + 3, COLOR_BORDER)
-	draw_circle(center, radius, COLOR_BACKGROUND)
+	# Draw square background and border
+	var border_rect := Rect2(Vector2(2, 2), size - Vector2(4, 4))
+	var inner_rect := Rect2(Vector2(4, 4), size - Vector2(8, 8))
+	draw_rect(border_rect, COLOR_BORDER)
+	draw_rect(inner_rect, COLOR_BACKGROUND)
 
 	# Draw terrain texture if available
 	if map_texture and local_player and is_instance_valid(local_player):
-		_draw_terrain(center, radius)
+		_draw_terrain(center, half_size)
 
 	# Draw compass directions
-	_draw_compass(center, radius)
+	_draw_compass(center, half_size)
 
 	if not local_player or not is_instance_valid(local_player):
 		_find_player()
@@ -176,17 +189,17 @@ func _draw() -> void:
 	var player_pos := local_player.global_position
 
 	# Draw enemies
-	_draw_enemies(center, radius, player_pos)
+	_draw_enemies(center, half_size, player_pos)
 
 	# Draw player (center, with direction indicator)
 	_draw_player_marker(center)
 
 	# Draw zoom indicator
 	if is_zoomed:
-		_draw_zoom_indicator(center, radius)
+		_draw_zoom_indicator(center, half_size)
 
 
-func _draw_terrain(center: Vector2, radius: float) -> void:
+func _draw_terrain(center: Vector2, half_size: float) -> void:
 	if not map_texture or not local_player:
 		return
 
@@ -217,33 +230,21 @@ func _draw_terrain(center: Vector2, radius: float) -> void:
 	atlas_texture.atlas = map_texture
 	atlas_texture.region = Rect2(region_x, region_y, visible_buffer_pixels, visible_buffer_pixels)
 
-	# Draw the terrain in a circular mask
-	# We'll draw a square and let the circular background clip it visually
-	var draw_size := radius * 2.0
-	var draw_pos := center - Vector2(radius, radius)
-
-	# Draw terrain texture
+	# Draw terrain texture as square
+	var draw_size := half_size * 2.0 - 4.0
+	var draw_pos := center - Vector2(half_size - 2, half_size - 2)
 	draw_texture_rect(atlas_texture, Rect2(draw_pos, Vector2(draw_size, draw_size)), false)
 
-	# Draw circular mask (by drawing the border on top)
-	# Draw corners to create circular appearance
-	var corner_color := COLOR_BACKGROUND
-	for angle in range(0, 360, 2):
-		var rad := deg_to_rad(angle)
-		var outer_point := center + Vector2(cos(rad), sin(rad)) * (radius + 10)
-		var edge_point := center + Vector2(cos(rad), sin(rad)) * radius
-		draw_line(edge_point, outer_point, corner_color, 12.0)
 
-
-func _draw_compass(center: Vector2, radius: float) -> void:
+func _draw_compass(center: Vector2, half_size: float) -> void:
 	var font := ThemeDB.fallback_font
 	var font_size := 10
 
 	var directions := [
-		{"label": "N", "offset": Vector2(0, -radius + 8)},
-		{"label": "S", "offset": Vector2(0, radius - 2)},
-		{"label": "E", "offset": Vector2(radius - 6, 4)},
-		{"label": "W", "offset": Vector2(-radius + 2, 4)}
+		{"label": "N", "offset": Vector2(0, -half_size + 8)},
+		{"label": "S", "offset": Vector2(0, half_size - 2)},
+		{"label": "E", "offset": Vector2(half_size - 6, 4)},
+		{"label": "W", "offset": Vector2(-half_size + 2, 4)}
 	]
 
 	for dir in directions:
@@ -255,7 +256,7 @@ func _draw_compass(center: Vector2, radius: float) -> void:
 		draw_string(font, pos, dir.label, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size, Color.WHITE)
 
 
-func _draw_enemies(center: Vector2, radius: float, player_pos: Vector3) -> void:
+func _draw_enemies(center: Vector2, half_size: float, player_pos: Vector3) -> void:
 	var enemies := get_tree().get_nodes_in_group("enemies")
 
 	for enemy in enemies:
@@ -270,11 +271,11 @@ func _draw_enemies(center: Vector2, radius: float, player_pos: Vector3) -> void:
 		)
 
 		# Scale to minimap
-		var map_pos := relative / current_world_radius * radius
+		var map_pos := relative / current_world_radius * half_size
 
-		# Clamp to circle
-		if map_pos.length() > radius - 4:
-			map_pos = map_pos.normalized() * (radius - 4)
+		# Clamp to square bounds
+		map_pos.x = clampf(map_pos.x, -half_size + 4, half_size - 4)
+		map_pos.y = clampf(map_pos.y, -half_size + 4, half_size - 4)
 
 		var screen_pos := center + map_pos
 
@@ -317,12 +318,12 @@ func _draw_player_marker(center: Vector2) -> void:
 	draw_circle(center, 3, COLOR_PLAYER)
 
 
-func _draw_zoom_indicator(center: Vector2, radius: float) -> void:
+func _draw_zoom_indicator(center: Vector2, half_size: float) -> void:
 	# Draw a small indicator that we're zoomed in
 	var font := ThemeDB.fallback_font
 	var font_size := 8
 	var text := "ZOOM"
-	var pos := center + Vector2(-radius + 5, radius - 5)
+	var pos := center + Vector2(-half_size + 5, half_size - 5)
 	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(1, 1, 0, 0.7))
 
 

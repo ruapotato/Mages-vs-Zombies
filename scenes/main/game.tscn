@@ -1,21 +1,31 @@
-[gd_scene load_steps=7 format=3 uid="uid://c1m2v3r4t5y6u"]
+[gd_scene load_steps=11 format=3 uid="uid://c1m2v3r4t5y6u"]
 
 [ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="1_player"]
 [ext_resource type="Script" path="res://scripts/terrain/terrain_world.gd" id="2_terrain"]
 [ext_resource type="Script" path="res://scripts/enemies/zombie_horde.gd" id="3_zombie_horde"]
 [ext_resource type="Script" path="res://scripts/main/game_controller.gd" id="4_game_controller"]
 [ext_resource type="PackedScene" path="res://scenes/ui/pause_menu.tscn" id="5_pause_menu"]
-[ext_resource type="PackedScene" uid="uid://game_hud_001" path="res://scenes/ui/game_hud.tscn" id="7_game_hud"]
 [ext_resource type="Script" path="res://scripts/terrain/environment_spawner.gd" id="6_environment"]
+[ext_resource type="PackedScene" uid="uid://game_hud_001" path="res://scenes/ui/game_hud.tscn" id="7_game_hud"]
+[ext_resource type="Shader" path="res://shaders/night_sky.gdshader" id="8_sky_shader"]
 
-[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_main"]
-sky_top_color = Color(0.2, 0.3, 0.6, 1)
-sky_horizon_color = Color(0.5, 0.5, 0.6, 1)
-ground_bottom_color = Color(0.1, 0.1, 0.15, 1)
-ground_horizon_color = Color(0.3, 0.3, 0.35, 1)
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
+shader = ExtResource("8_sky_shader")
+shader_parameter/sky_top_color = Vector3(0.3, 0.6, 1.0)
+shader_parameter/sky_horizon_color = Vector3(0.6, 0.75, 0.95)
+shader_parameter/ground_color = Vector3(0.3, 0.25, 0.2)
+shader_parameter/sun_direction = Vector3(0.3, 0.7, -0.5)
+shader_parameter/sun_size = 0.03
+shader_parameter/star_brightness = 0.0
+shader_parameter/star_density = 2000.0
+shader_parameter/star_twinkle_speed = 1.5
+shader_parameter/moon_direction = Vector3(0.5, 0.5, -0.5)
+shader_parameter/moon_phase = 0.5
+shader_parameter/moon_size = 0.06
+shader_parameter/time = 0.0
 
 [sub_resource type="Sky" id="Sky_main"]
-sky_material = SubResource("ProceduralSkyMaterial_main")
+sky_material = SubResource("ShaderMaterial_sky")
 
 [sub_resource type="Environment" id="Environment_main"]
 background_mode = 2
@@ -50,10 +60,13 @@ world_seed = 12345
 
 [node name="EnvironmentSpawner" type="Node3D" parent="."]
 script = ExtResource("6_environment")
-spawn_radius = 100.0
-max_trees = 250
-max_rocks = 120
-max_grass = 400
+spawn_radius = 200.0
+tree_density = 0.025
+rock_density = 0.015
+grass_density = 0.06
+max_trees = 600
+max_rocks = 250
+max_grass = 800
 
 [node name="ZombieHorde" type="Node3D" parent="."]
 script = ExtResource("3_zombie_horde")

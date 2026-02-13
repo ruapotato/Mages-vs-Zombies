@@ -8,16 +8,16 @@ signal environment_ready()
 
 # Configuration
 @export_group("Spawning")
-@export var spawn_radius: float = 80.0  # How far to spawn objects
-@export var update_radius: float = 100.0  # How far before re-centering
-@export var tree_density: float = 0.015  # Trees per square unit
-@export var rock_density: float = 0.05  # Rocks per square unit
-@export var grass_density: float = 0.04  # Grass clumps per square unit
+@export var spawn_radius: float = 200.0  # How far to spawn objects (very far for 2D billboards)
+@export var update_radius: float = 80.0  # How far before re-centering
+@export var tree_density: float = 0.025  # Trees per square unit (more dense)
+@export var rock_density: float = 0.015  # Rocks per square unit
+@export var grass_density: float = 0.06  # Grass clumps per square unit (more dense)
 
 @export_group("Object Limits")
-@export var max_trees: int = 200
-@export var max_rocks: int = 100
-@export var max_grass: int = 300
+@export var max_trees: int = 600
+@export var max_rocks: int = 250
+@export var max_grass: int = 800
 
 # Internal state
 var terrain_world: Node = null
@@ -43,14 +43,38 @@ var grass_texture: ImageTexture = null
 # Grid-based spawning
 const GRID_SIZE: float = 8.0  # Size of spawn grid cells
 
-# Tree type weights by biome height
-const TREE_TYPES_BY_HEIGHT: Array = [
-	{"type": "swamp", "min_height": -5, "max_height": 5, "weight": 1.0},
-	{"type": "oak", "min_height": 5, "max_height": 25, "weight": 1.5},
-	{"type": "pine", "min_height": 20, "max_height": 50, "weight": 1.2},
-	{"type": "dead", "min_height": -10, "max_height": 60, "weight": 0.3},
-	{"type": "magic", "min_height": 15, "max_height": 45, "weight": 0.15},
-]
+# Tree types by biome - each biome has different vegetation
+const BIOME_TREES: Dictionary = {
+	"valley": ["oak", "oak", "pine", "magic"],  # Serene meadows with occasional magic trees
+	"dark_forest": ["dark_oak", "dark_oak", "swamp", "dead"],  # Very dark, twisted trees
+	"swamp": ["swamp", "swamp", "dead", "swamp"],  # Mostly swamp trees with some dead
+	"mountain": ["frost_pine", "frost_pine", "pine", "dead"],  # Snowy pines
+	"desert": ["cactus", "cactus", "palm", "dead"],  # Cacti and palm trees
+	"wizardland": ["crystal_tree", "crystal_tree", "magic", "crystal_tree"],  # Magical crystal trees
+	"hell": ["ember_tree", "ember_tree", "dead", "ember_tree"],  # Burning ember trees
+}
+
+# Tree density multiplier by biome (some biomes have more/less vegetation)
+const BIOME_TREE_DENSITY: Dictionary = {
+	"valley": 1.2,
+	"dark_forest": 1.5,  # Dense forest
+	"swamp": 0.8,
+	"mountain": 0.4,  # Sparse at high altitude
+	"desert": 0.15,  # Very sparse
+	"wizardland": 0.6,
+	"hell": 0.3,  # Barren wasteland
+}
+
+# Grass spawning by biome
+const BIOME_HAS_GRASS: Dictionary = {
+	"valley": true,
+	"dark_forest": true,
+	"swamp": true,
+	"mountain": false,  # Snow, no grass
+	"desert": false,  # Sand, no grass
+	"wizardland": true,
+	"hell": false,  # Fire, no grass
+}
 
 
 func _ready() -> void:
@@ -96,10 +120,13 @@ func _generate_textures() -> void:
 	var tex_gen = get_node_or_null("/root/TextureGenerator")
 
 	if tex_gen:
-		# Pre-generate tree textures
-		for tree_type in ["oak", "pine", "dead", "magic", "swamp"]:
+		# Pre-generate all tree textures including biome-specific ones
+		var all_tree_types := ["oak", "pine", "dead", "magic", "swamp",
+							   "cactus", "palm", "frost_pine", "crystal_tree",
+							   "ember_tree", "dark_oak"]
+		for tree_type in all_tree_types:
 			tree_textures[tree_type] = tex_gen.generate_tree_texture(tree_type)
-		print("[EnvironmentSpawner] Generated tree textures")
+		print("[EnvironmentSpawner] Generated %d tree textures" % all_tree_types.size())
 	else:
 		# Fallback textures
 		_generate_fallback_textures()
@@ -215,7 +242,7 @@ func _create_object_pools() -> void:
 
 func _create_billboard_sprite() -> Sprite3D:
 	var sprite = Sprite3D.new()
-	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sprite.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y  # Stay upright when looking up/down
 	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	sprite.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
 	sprite.render_priority = 0
@@ -239,37 +266,98 @@ func _spawn_environment_around(center: Vector3) -> void:
 	for sprite in grass_pool:
 		sprite.visible = false
 
-	# Seed RNG based on world position for consistency
-	rng.seed = int(center.x / GRID_SIZE) * 73856093 ^ int(center.z / GRID_SIZE) * 19349663
-
 	var tree_idx = 0
 	var rock_idx = 0
 	var grass_idx = 0
 
-	# Spawn in grid cells around center
+	# Collect all valid grid cells with their distances
 	var grid_radius = int(spawn_radius / GRID_SIZE)
+	var cells: Array = []
 
 	for gx in range(-grid_radius, grid_radius + 1):
 		for gz in range(-grid_radius, grid_radius + 1):
 			var grid_x = int(center.x / GRID_SIZE) + gx
 			var grid_z = int(center.z / GRID_SIZE) + gz
-			var grid_key = "%d,%d" % [grid_x, grid_z]
 
-			# Check distance
 			var cell_center = Vector3(grid_x * GRID_SIZE + GRID_SIZE * 0.5, 0, grid_z * GRID_SIZE + GRID_SIZE * 0.5)
 			var dist = Vector2(cell_center.x - center.x, cell_center.z - center.z).length()
 			if dist > spawn_radius:
 				continue
 
-			# Seed RNG for this cell (consistent spawning)
-			rng.seed = grid_x * 73856093 ^ grid_z * 19349663
+			cells.append({"x": grid_x, "z": grid_z, "dist": dist})
 
-			var cell_area = GRID_SIZE * GRID_SIZE
+	# Sort cells by distance (closest first) - ensures nearby objects get priority
+	cells.sort_custom(func(a, b): return a.dist < b.dist)
 
-			# Spawn trees in this cell
-			var num_trees = int(cell_area * tree_density * (0.5 + rng.randf()))
-			for _t in range(num_trees):
-				if tree_idx >= max_trees:
+	var cell_area = GRID_SIZE * GRID_SIZE
+
+	# Spawn objects in distance-sorted order
+	for cell in cells:
+		var grid_x: int = cell.x
+		var grid_z: int = cell.z
+		var dist: float = cell.dist
+		var grid_key = "%d,%d" % [grid_x, grid_z]
+
+		# Seed RNG for this cell (consistent spawning)
+		rng.seed = grid_x * 73856093 ^ grid_z * 19349663
+
+		# Get biome for this cell (use cell center)
+		var cell_world_x = grid_x * GRID_SIZE + GRID_SIZE * 0.5
+		var cell_world_z = grid_z * GRID_SIZE + GRID_SIZE * 0.5
+		var biome = _get_biome_at(cell_world_x, cell_world_z)
+		var biome_density_mult = _get_tree_density_for_biome(biome)
+
+		# Spawn trees in this cell based on biome
+		var num_trees = int(cell_area * tree_density * biome_density_mult * (0.5 + rng.randf()))
+		for _t in range(num_trees):
+			if tree_idx >= max_trees:
+				break
+
+			var local_x = rng.randf() * GRID_SIZE
+			var local_z = rng.randf() * GRID_SIZE
+			var world_x = grid_x * GRID_SIZE + local_x
+			var world_z = grid_z * GRID_SIZE + local_z
+
+			var height = _get_terrain_height(world_x, world_z)
+			if height < -10 or height > 80:  # Skip water/extreme heights
+				continue
+
+			var pos = Vector3(world_x, height, world_z)
+			var tree_type = _get_tree_type_for_biome(biome)
+
+			if tree_pool[tree_idx]:
+				_place_tree(tree_pool[tree_idx], pos, tree_type)
+				active_trees[grid_key + "_t" + str(_t)] = tree_pool[tree_idx]
+				tree_idx += 1
+
+		# Spawn rocks in this cell
+		var num_rocks = int(cell_area * rock_density * (0.5 + rng.randf()))
+		for _r in range(num_rocks):
+			if rock_idx >= max_rocks:
+				break
+
+			var local_x = rng.randf() * GRID_SIZE
+			var local_z = rng.randf() * GRID_SIZE
+			var world_x = grid_x * GRID_SIZE + local_x
+			var world_z = grid_z * GRID_SIZE + local_z
+
+			var height = _get_terrain_height(world_x, world_z)
+			# Rocks spawn almost everywhere
+			if height < -100:  # Only skip if way under water
+				continue
+
+			var pos = Vector3(world_x, height, world_z)
+
+			if rock_pool[rock_idx]:
+				_place_rock(rock_pool[rock_idx], pos, biome)
+				active_rocks[grid_key + "_r" + str(_r)] = rock_pool[rock_idx]
+				rock_idx += 1
+
+		# Spawn grass in this cell (only close to player and in biomes with grass)
+		if dist < spawn_radius * 0.5 and _biome_has_grass(biome):
+			var num_grass = int(cell_area * grass_density * (0.5 + rng.randf()))
+			for _g in range(num_grass):
+				if grass_idx >= max_grass:
 					break
 
 				var local_x = rng.randf() * GRID_SIZE
@@ -278,62 +366,15 @@ func _spawn_environment_around(center: Vector3) -> void:
 				var world_z = grid_z * GRID_SIZE + local_z
 
 				var height = _get_terrain_height(world_x, world_z)
-				if height < -10 or height > 60:  # Skip water/extreme heights
-					continue
-
-				var pos = Vector3(world_x, height, world_z)
-				var tree_type = _get_tree_type_for_height(height)
-
-				if tree_pool[tree_idx]:
-					_place_tree(tree_pool[tree_idx], pos, tree_type)
-					active_trees[grid_key + "_t" + str(_t)] = tree_pool[tree_idx]
-					tree_idx += 1
-
-			# Spawn rocks in this cell
-			var num_rocks = int(cell_area * rock_density * (0.5 + rng.randf()))
-			for _r in range(num_rocks):
-				if rock_idx >= max_rocks:
-					break
-
-				var local_x = rng.randf() * GRID_SIZE
-				var local_z = rng.randf() * GRID_SIZE
-				var world_x = grid_x * GRID_SIZE + local_x
-				var world_z = grid_z * GRID_SIZE + local_z
-
-				var height = _get_terrain_height(world_x, world_z)
-				# Rocks spawn almost everywhere
-				if height < -100:  # Only skip if way under water
+				if height < 0 or height > 50:
 					continue
 
 				var pos = Vector3(world_x, height, world_z)
 
-				if rock_pool[rock_idx]:
-					_place_rock(rock_pool[rock_idx], pos)
-					active_rocks[grid_key + "_r" + str(_r)] = rock_pool[rock_idx]
-					rock_idx += 1
-
-			# Spawn grass in this cell (only close to player)
-			if dist < spawn_radius * 0.5:
-				var num_grass = int(cell_area * grass_density * (0.5 + rng.randf()))
-				for _g in range(num_grass):
-					if grass_idx >= max_grass:
-						break
-
-					var local_x = rng.randf() * GRID_SIZE
-					var local_z = rng.randf() * GRID_SIZE
-					var world_x = grid_x * GRID_SIZE + local_x
-					var world_z = grid_z * GRID_SIZE + local_z
-
-					var height = _get_terrain_height(world_x, world_z)
-					if height < 0 or height > 40:
-						continue
-
-					var pos = Vector3(world_x, height, world_z)
-
-					if grass_pool[grass_idx]:
-						_place_grass(grass_pool[grass_idx], pos)
-						active_grass[grid_key + "_g" + str(_g)] = grass_pool[grass_idx]
-						grass_idx += 1
+				if grass_pool[grass_idx]:
+					_place_grass(grass_pool[grass_idx], pos, biome)
+					active_grass[grid_key + "_g" + str(_g)] = grass_pool[grass_idx]
+					grass_idx += 1
 
 	print("[EnvironmentSpawner] Spawned %d trees, %d rocks, %d grass around (%.0f, %.0f)" % [
 		tree_idx, rock_idx, grass_idx, center.x, center.z
@@ -351,27 +392,23 @@ func _get_terrain_height(x: float, z: float) -> float:
 	return 0.0
 
 
-func _get_tree_type_for_height(height: float) -> String:
-	var candidates: Array = []
-	var total_weight: float = 0.0
+func _get_biome_at(x: float, z: float) -> String:
+	if terrain_world and terrain_world.has_method("get_biome_at"):
+		return terrain_world.get_biome_at(Vector2(x, z))
+	return "valley"
 
-	for tree_info in TREE_TYPES_BY_HEIGHT:
-		if height >= tree_info["min_height"] and height <= tree_info["max_height"]:
-			candidates.append(tree_info)
-			total_weight += tree_info["weight"]
 
-	if candidates.size() == 0:
-		return "oak"
+func _get_tree_type_for_biome(biome: String) -> String:
+	var tree_types: Array = BIOME_TREES.get(biome, BIOME_TREES["valley"])
+	return tree_types[rng.randi() % tree_types.size()]
 
-	var roll = rng.randf() * total_weight
-	var cumulative: float = 0.0
 
-	for tree_info in candidates:
-		cumulative += tree_info["weight"]
-		if roll <= cumulative:
-			return tree_info["type"]
+func _get_tree_density_for_biome(biome: String) -> float:
+	return BIOME_TREE_DENSITY.get(biome, 1.0)
 
-	return candidates[0]["type"]
+
+func _biome_has_grass(biome: String) -> bool:
+	return BIOME_HAS_GRASS.get(biome, true)
 
 
 func _place_tree(sprite: Sprite3D, pos: Vector3, tree_type: String) -> void:
@@ -394,11 +431,35 @@ func _place_tree(sprite: Sprite3D, pos: Vector3, tree_type: String) -> void:
 	sprite.visible = true
 
 
-func _place_rock(sprite: Sprite3D, pos: Vector3) -> void:
+# Biome rock colors
+const BIOME_ROCK_COLORS: Dictionary = {
+	"valley": Color(0.6, 0.58, 0.55),
+	"dark_forest": Color(0.3, 0.35, 0.3),
+	"swamp": Color(0.4, 0.38, 0.32),
+	"mountain": Color(0.75, 0.78, 0.82),  # Light grey/white
+	"desert": Color(0.85, 0.75, 0.55),  # Sandy
+	"wizardland": Color(0.6, 0.4, 0.7),  # Purple tinted
+	"hell": Color(0.4, 0.2, 0.15),  # Dark red/black
+}
+
+# Biome grass colors
+const BIOME_GRASS_COLORS: Dictionary = {
+	"valley": Color(0.3, 0.6, 0.3),
+	"dark_forest": Color(0.1, 0.25, 0.15),
+	"swamp": Color(0.4, 0.5, 0.25),
+	"wizardland": Color(0.6, 0.3, 0.7),
+}
+
+
+func _place_rock(sprite: Sprite3D, pos: Vector3, biome: String = "valley") -> void:
 	# Bigger rocks
-	sprite.pixel_size = 0.04  # Was 0.03 in pool
+	sprite.pixel_size = 0.04
 	var scale_var = 0.6 + rng.randf() * 1.2  # Range 0.6 to 1.8
 	sprite.scale = Vector3.ONE * scale_var
+
+	# Tint rock based on biome
+	var rock_color: Color = BIOME_ROCK_COLORS.get(biome, BIOME_ROCK_COLORS["valley"])
+	sprite.modulate = rock_color.lightened(rng.randf() * 0.2 - 0.1)
 
 	# Rock sits on ground
 	var rock_height = 48 * sprite.pixel_size * scale_var
@@ -408,10 +469,14 @@ func _place_rock(sprite: Sprite3D, pos: Vector3) -> void:
 	sprite.visible = true
 
 
-func _place_grass(sprite: Sprite3D, pos: Vector3) -> void:
-	sprite.pixel_size = 0.02  # Was 0.015 in pool
+func _place_grass(sprite: Sprite3D, pos: Vector3, biome: String = "valley") -> void:
+	sprite.pixel_size = 0.02
 	var scale_var = 0.7 + rng.randf() * 0.9  # Range 0.7 to 1.6
 	sprite.scale = Vector3.ONE * scale_var
+
+	# Tint grass based on biome
+	var grass_color: Color = BIOME_GRASS_COLORS.get(biome, BIOME_GRASS_COLORS["valley"])
+	sprite.modulate = grass_color.lightened(rng.randf() * 0.3 - 0.15)
 
 	var grass_height = 48 * sprite.pixel_size * scale_var
 	sprite.position = pos + Vector3(0, grass_height * 0.35, 0)
