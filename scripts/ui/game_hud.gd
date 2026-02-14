@@ -14,8 +14,10 @@ var mana_bar_fill: ColorRect
 var mana_label: Label
 var spell_container: HBoxContainer
 var damage_overlay: ColorRect
-var wave_label: Label
+var tide_label: Label
 var zombie_count_label: Label
+var clock_label: Label
+var fps_label: Label
 var minimap: Control
 
 # Spell slot UI elements
@@ -41,7 +43,8 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_update_player_stats()
 	_update_damage_overlay(delta)
-	_update_wave_info()
+	_update_tide_info()
+	_update_clock_fps()
 
 
 func _find_player() -> void:
@@ -75,8 +78,11 @@ func _create_ui() -> void:
 	# === DAMAGE OVERLAY (full screen red vignette) ===
 	_create_damage_overlay(root)
 
-	# === WAVE INFO (top left) ===
-	_create_wave_info(root)
+	# === TIDE INFO (top left) ===
+	_create_tide_info(root)
+
+	# === CLOCK & FPS (top center) ===
+	_create_clock_fps(root)
 
 	# === MINIMAP (top right) ===
 	_create_minimap(root)
@@ -294,26 +300,48 @@ func _create_damage_overlay(parent: Control) -> void:
 	parent.add_child(damage_overlay)
 
 
-func _create_wave_info(parent: Control) -> void:
+func _create_tide_info(parent: Control) -> void:
 	var container = Control.new()
 	container.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	container.position = Vector2(20, 20)
 	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(container)
 
-	wave_label = Label.new()
-	wave_label.text = "Wave 1"
-	wave_label.position = Vector2(0, 0)
-	wave_label.add_theme_font_size_override("font_size", 32)
-	wave_label.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
-	container.add_child(wave_label)
+	tide_label = Label.new()
+	tide_label.text = "Day - Calm"
+	tide_label.position = Vector2(0, 0)
+	tide_label.add_theme_font_size_override("font_size", 24)
+	tide_label.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
+	container.add_child(tide_label)
 
 	zombie_count_label = Label.new()
 	zombie_count_label.text = "Zombies: 0"
-	zombie_count_label.position = Vector2(0, 40)
+	zombie_count_label.position = Vector2(0, 32)
 	zombie_count_label.add_theme_font_size_override("font_size", 18)
 	zombie_count_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
 	container.add_child(zombie_count_label)
+
+
+func _create_clock_fps(parent: Control) -> void:
+	var container = Control.new()
+	container.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	container.position = Vector2(20, 80)
+	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(container)
+
+	clock_label = Label.new()
+	clock_label.text = "12:00"
+	clock_label.position = Vector2(0, 0)
+	clock_label.add_theme_font_size_override("font_size", 20)
+	clock_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+	container.add_child(clock_label)
+
+	fps_label = Label.new()
+	fps_label.text = "FPS: 60"
+	fps_label.position = Vector2(0, 24)
+	fps_label.add_theme_font_size_override("font_size", 14)
+	fps_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	container.add_child(fps_label)
 
 
 func _update_player_stats() -> void:
@@ -370,17 +398,60 @@ func _update_damage_overlay(delta: float) -> void:
 		damage_overlay.color.a = damage_intensity * 0.5
 
 
-func _update_wave_info() -> void:
+func _update_tide_info() -> void:
 	var hordes = get_tree().get_nodes_in_group("zombie_horde")
 	if hordes.size() > 0:
 		var horde = hordes[0]
 		if horde.has_method("get_stats"):
 			var stats = horde.get_stats()
-			wave_label.text = "Wave %d" % stats.current_wave
-			zombie_count_label.text = "Zombies: %d" % stats.active_zombies
-		elif "current_wave" in horde:
-			wave_label.text = "Wave %d" % horde.current_wave
+			var period: String = stats.get("time_period", "day")
+			var tide_text := _get_tide_text(period)
+			tide_label.text = tide_text
+			tide_label.add_theme_color_override("font_color", _get_period_color(period))
+			zombie_count_label.text = "Zombies: %d / %d" % [stats.active_zombies, stats.target_zombies]
+		elif "all_zombies" in horde:
 			zombie_count_label.text = "Zombies: %d" % horde.all_zombies.size()
+
+
+func _get_tide_text(period: String) -> String:
+	match period:
+		"night":
+			return "NIGHT - Swarm!"
+		"dawn":
+			return "Dawn - Tide Receding"
+		"dusk":
+			return "Dusk - Tide Rising"
+		_:
+			return "Day - Calm"
+
+
+func _get_period_color(period: String) -> Color:
+	match period:
+		"night":
+			return Color(1.0, 0.3, 0.3)  # Red
+		"dawn":
+			return Color(1.0, 0.7, 0.4)  # Orange
+		"dusk":
+			return Color(0.8, 0.5, 0.9)  # Purple
+		_:
+			return Color(1.0, 0.95, 0.5)  # Yellow
+
+
+func _update_clock_fps() -> void:
+	# Update FPS
+	fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
+
+	# Update clock from DayNightCycle
+	if DayNightCycle:
+		var hour: int = int(DayNightCycle.current_hour) % 24
+		var minute: int = int((DayNightCycle.current_hour - int(DayNightCycle.current_hour)) * 60)
+		var am_pm := "AM" if hour < 12 else "PM"
+		var display_hour := hour % 12
+		if display_hour == 0:
+			display_hour = 12
+		clock_label.text = "%d:%02d %s" % [display_hour, minute, am_pm]
+	else:
+		clock_label.text = "--:--"
 
 
 func _create_minimap(parent: Control) -> void:
