@@ -1,33 +1,28 @@
 extends Node3D
 class_name ZombieHorde
 
-## ZombieHorde - Centralized zombie manager for performance and wave spawning
-## Handles batch processing, LOD system, wave difficulty scaling, and night mechanics
-## CRITICAL: Zombies are MUCH stronger and more numerous at night!
+## ZombieHorde - Centralized zombie manager with continuous day/night tide spawning
+## Zombies always spawn, but rate and intensity varies with day/night cycle
+## Night = dangerous flood of zombies, Day = calmer but never safe
 
-signal wave_started(wave_number: int, zombie_count: int)
-signal wave_completed(wave_number: int)
 signal zombie_spawned(zombie: Node3D)
 signal zombie_died(zombie: Node3D, killer_id: int, is_headshot: bool)
-signal all_zombies_defeated()
 
-# Wave configuration
-@export_group("Wave Settings")
-@export var enable_waves: bool = true
-@export var wave_interval: float = 30.0  # 30 seconds between waves
-@export var first_wave_delay: float = 5.0  # Start first wave after 5 seconds
-@export var base_zombies_per_wave: int = 5
-@export var zombies_per_wave_increase: int = 2
-@export var max_active_zombies: int = 50
-
-# Spawn configuration
+# Continuous spawn configuration
 @export_group("Spawn Settings")
-@export var spawn_radius_min: float = 20.0
-@export var spawn_radius_max: float = 40.0
-@export var despawn_radius: float = 80.0  # Despawn zombies beyond this distance from player
-@export var night_spawn_multiplier: float = 2.0  # 2x more zombies at night!
-@export var night_spawn_rate_multiplier: float = 1.5  # Spawn 50% faster at night
-@export var spawn_height_offset: float = 1.0  # Spawn slightly above ground to avoid embedding in terrain
+@export var spawn_radius_min: float = 25.0
+@export var spawn_radius_max: float = 45.0
+@export var despawn_radius: float = 80.0
+@export var spawn_height_offset: float = 1.0
+
+# Day/Night tide settings
+@export_group("Day/Night Tide")
+@export var day_target_zombies: int = 8       # Few zombies during day
+@export var night_target_zombies: int = 30    # Swarm at night
+@export var dawn_dusk_target: int = 15        # Medium during transitions
+@export var day_spawn_interval: float = 3.0   # Slow spawns during day
+@export var night_spawn_interval: float = 0.5 # Rapid spawns at night
+@export var max_active_zombies: int = 50      # Hard cap
 
 # LOD (Level of Detail) settings - from original implementation
 @export_group("LOD Settings")
@@ -68,12 +63,8 @@ const BIOME_ZOMBIE_WEIGHTS: Dictionary = {
 # Internal state
 var all_zombies: Array[Node3D] = []
 var zombie_data: Dictionary = {}  # zombie -> {target, path_timer, sync_timer, etc}
-var current_wave: int = 0
-var wave_timer: float = 0.0
-var is_wave_active: bool = false
-var zombies_to_spawn: int = 0
-var spawn_cooldown: float = 0.0
-const SPAWN_INTERVAL: float = 1.0  # Spawn one zombie per second
+var spawn_timer: float = 0.0
+var current_spawn_interval: float = 1.0  # Dynamically adjusted based on time of day
 
 # Batch processing state
 var path_batch_index: int = 0
@@ -123,10 +114,9 @@ func _ready() -> void:
 	# Load zombie type scenes
 	_load_zombie_types()
 
-	# Start wave timer (use first_wave_delay for the first wave)
-	if enable_waves:
-		wave_timer = first_wave_delay
-		print("[ZombieHorde] First wave in %.1f seconds" % first_wave_delay)
+	# Initialize spawn interval based on current time of day
+	_update_spawn_settings()
+	print("[ZombieHorde] Continuous tide spawning active - zombies will always be around!")
 
 	# Connect to day/night cycle for difficulty updates
 	if DayNightCycle:
@@ -186,21 +176,8 @@ func _on_zombie_removed(node: Node) -> void:
 		zombie_data.erase(node)
 
 func _physics_process(delta: float) -> void:
-	# Wave spawning
-	if enable_waves:
-		_process_wave_spawning(delta)
-
-	# Spawn queued zombies
-	if zombies_to_spawn > 0:
-		spawn_cooldown -= delta
-		if spawn_cooldown <= 0:
-			var spawn_interval = SPAWN_INTERVAL
-			if DayNightCycle and DayNightCycle.is_night():
-				spawn_interval /= night_spawn_rate_multiplier
-
-			spawn_cooldown = spawn_interval
-			_spawn_random_zombie()
-			zombies_to_spawn -= 1
+	# Continuous tide spawning - always spawn zombies, rate varies by time of day
+	_process_continuous_spawning(delta)
 
 	# Clean up dead/invalid zombies from tracking
 	_cleanup_dead_zombies()
@@ -234,48 +211,51 @@ func _physics_process(delta: float) -> void:
 	if multiplayer:
 		_process_sync_batch()
 
-func _process_wave_spawning(delta: float) -> void:
-	if is_wave_active:
-		# Wait for all zombies to be defeated
-		if all_zombies.size() == 0 and zombies_to_spawn == 0:
-			_complete_wave()
-	else:
-		# Count down to next wave
-		wave_timer -= delta
-		if wave_timer <= 0:
-			_start_wave()
+func _process_continuous_spawning(delta: float) -> void:
+	# Get current target zombie count based on time of day
+	var target_count := _get_target_zombie_count()
+	var current_count := all_zombies.size()
 
-func _start_wave() -> void:
-	current_wave += 1
-	is_wave_active = true
+	# Update spawn interval periodically
+	_update_spawn_settings()
 
-	# Calculate zombies for this wave
-	var base_count = base_zombies_per_wave + (current_wave - 1) * zombies_per_wave_increase
+	# Only spawn if below target and below hard cap
+	if current_count >= target_count or current_count >= max_active_zombies:
+		return
 
-	# Apply night multiplier if it's night - MAKE NIGHT SCARY!
-	if DayNightCycle and DayNightCycle.is_night():
-		base_count = int(base_count * night_spawn_multiplier)
+	# Count down spawn timer
+	spawn_timer -= delta
+	if spawn_timer <= 0:
+		spawn_timer = current_spawn_interval
+		_spawn_random_zombie()
 
-	# Cap at max active zombies
-	zombies_to_spawn = min(base_count, max_active_zombies)
+func _get_target_zombie_count() -> int:
+	if not DayNightCycle:
+		return day_target_zombies
 
-	print("[ZombieHorde] Wave %d started! Spawning %d zombies%s" % [
-		current_wave,
-		zombies_to_spawn,
-		" (NIGHT WAVE - 2X ZOMBIES!)" if (DayNightCycle and DayNightCycle.is_night()) else ""
-	])
-	emit_signal("wave_started", current_wave, zombies_to_spawn)
+	var period := DayNightCycle.get_period()
+	match period:
+		"night":
+			return night_target_zombies
+		"dawn", "dusk":
+			return dawn_dusk_target
+		_:  # "day" or any other
+			return day_target_zombies
 
-func _complete_wave() -> void:
-	is_wave_active = false
-	wave_timer = wave_interval
+func _update_spawn_settings() -> void:
+	if not DayNightCycle:
+		current_spawn_interval = day_spawn_interval
+		return
 
-	print("[ZombieHorde] Wave %d completed!" % current_wave)
-	emit_signal("wave_completed", current_wave)
-
-	# Check if all zombies ever spawned are defeated
-	if total_zombies_killed == total_zombies_spawned:
-		emit_signal("all_zombies_defeated")
+	var period := DayNightCycle.get_period()
+	match period:
+		"night":
+			current_spawn_interval = night_spawn_interval
+		"dawn", "dusk":
+			# Transition period - interpolate between day and night
+			current_spawn_interval = (day_spawn_interval + night_spawn_interval) / 2.0
+		_:  # "day"
+			current_spawn_interval = day_spawn_interval
 
 func _spawn_random_zombie():  # -> ZombieBase
 	if not player or not is_instance_valid(player):
@@ -810,26 +790,32 @@ func _try_load_scene(primary_path: String, fallback_path: String) -> PackedScene
 	return null
 
 func _on_period_changed(period: String) -> void:
-	if period == "night":
-		print("[ZombieHorde] NIGHT HAS FALLEN! Zombies are now 2X stronger, 1.5X faster, with 50% more health!")
-		print("[ZombieHorde] Waves will spawn 2X MORE zombies! SEEK SHELTER!")
-	elif period == "day":
-		print("[ZombieHorde] Daybreak! Zombies return to normal strength.")
+	_update_spawn_settings()
+	match period:
+		"night":
+			print("[ZombieHorde] NIGHT HAS FALLEN! The tide surges - %d zombies incoming!" % night_target_zombies)
+			print("[ZombieHorde] Spawn rate increased to every %.1f seconds! SEEK SHELTER!" % night_spawn_interval)
+		"dawn":
+			print("[ZombieHorde] Dawn approaches... The tide begins to recede.")
+		"dusk":
+			print("[ZombieHorde] Dusk falls... The tide begins to rise. Prepare yourself!")
+		"day":
+			print("[ZombieHorde] Daybreak! The tide calms - only %d zombies roaming." % day_target_zombies)
 
 ## Manual spawn function (for testing or special events)
 func spawn_zombies(count: int, zombie_type: String = "") -> void:
 	for i in range(count):
 		if zombie_type == "":
-			zombies_to_spawn += 1
+			_spawn_random_zombie()
 		else:
 			var zombie = _create_zombie(zombie_type)
 			if zombie:
 				var spawn_pos = _get_random_spawn_position()
-				zombie.global_position = spawn_pos
 				if zombies_container:
 					zombies_container.add_child(zombie)
 				else:
 					add_child(zombie)
+				zombie.global_position = spawn_pos
 				if not zombies_container:
 					all_zombies.append(zombie)
 					zombie.died.connect(_on_zombie_died)
@@ -843,16 +829,19 @@ func clear_all_zombies() -> void:
 
 	all_zombies.clear()
 	zombie_data.clear()
-	zombies_to_spawn = 0
-	is_wave_active = false
+	spawn_timer = 0.0
 
 ## Get statistics
 func get_stats() -> Dictionary:
+	var period := "day"
+	if DayNightCycle:
+		period = DayNightCycle.get_period()
+
 	return {
 		"active_zombies": all_zombies.size(),
-		"queued_spawns": zombies_to_spawn,
-		"current_wave": current_wave,
-		"is_wave_active": is_wave_active,
+		"target_zombies": _get_target_zombie_count(),
+		"spawn_interval": current_spawn_interval,
+		"time_period": period,
 		"total_spawned": total_zombies_spawned,
 		"total_killed": total_zombies_killed,
 		"difficulty_multiplier": difficulty_multiplier,
