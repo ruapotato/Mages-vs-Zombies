@@ -233,7 +233,7 @@ func _get_target_zombie_count() -> int:
 	if not DayNightCycle:
 		return day_target_zombies
 
-	var period := DayNightCycle.get_period()
+	var period: String = DayNightCycle.get_period()
 	match period:
 		"night":
 			return night_target_zombies
@@ -247,7 +247,7 @@ func _update_spawn_settings() -> void:
 		current_spawn_interval = day_spawn_interval
 		return
 
-	var period := DayNightCycle.get_period()
+	var period: String = DayNightCycle.get_period()
 	match period:
 		"night":
 			current_spawn_interval = night_spawn_interval
