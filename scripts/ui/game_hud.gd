@@ -408,7 +408,7 @@ func _update_tide_info() -> void:
 			var tide_text := _get_tide_text(period)
 			tide_label.text = tide_text
 			tide_label.add_theme_color_override("font_color", _get_period_color(period))
-			zombie_count_label.text = "Zombies: %d / %d" % [stats.active_zombies, stats.target_zombies]
+			zombie_count_label.text = "Zombies: %d / %d" % [stats["active_zombies"], stats["target_zombies"]]
 		elif "all_zombies" in horde:
 			zombie_count_label.text = "Zombies: %d" % horde.all_zombies.size()
 
