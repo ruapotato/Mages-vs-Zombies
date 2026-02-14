@@ -17,11 +17,11 @@ signal zombie_died(zombie: Node3D, killer_id: int, is_headshot: bool)
 
 # Day/Night tide settings
 @export_group("Day/Night Tide")
-@export var day_target_zombies: int = 8       # Few zombies during day
-@export var night_target_zombies: int = 30    # Swarm at night
-@export var dawn_dusk_target: int = 15        # Medium during transitions
-@export var day_spawn_interval: float = 3.0   # Slow spawns during day
-@export var night_spawn_interval: float = 0.5 # Rapid spawns at night
+@export var day_target_zombies: int = 3       # Very few zombies during day - peaceful
+@export var night_target_zombies: int = 35    # Overwhelming swarm at night
+@export var dawn_dusk_target: int = 12        # Medium during transitions
+@export var day_spawn_interval: float = 6.0   # Very slow spawns during day
+@export var night_spawn_interval: float = 0.4 # Rapid spawns at night
 @export var max_active_zombies: int = 50      # Hard cap
 
 # LOD (Level of Detail) settings - from original implementation
