@@ -6,6 +6,9 @@ class_name PlayerController
 
 # Preloaded resources
 const LightningMaterial = preload("res://resources/materials/lightning_material.tres")
+const FrostRingMaterial = preload("res://resources/materials/frost_ring_material.tres")
+const FireRingMaterial = preload("res://resources/materials/fire_ring_material.tres")
+const HealMaterial = preload("res://resources/materials/heal_material.tres")
 
 # Node references
 @onready var camera: Camera3D = $CameraMount/Camera3D
@@ -118,10 +121,10 @@ func _prewarm_spell_effects() -> void:
 
 	# Test ground ring (frost nova / flame wave)
 	print("[Player] Testing ground ring (frost)...")
-	_test_ground_ring(Color(0.4, 0.8, 1.0), 8.0, test_pos)
+	_test_ground_ring(FrostRingMaterial, 8.0, test_pos)
 
 	print("[Player] Testing ground ring (fire)...")
-	_test_ground_ring(Color(1.0, 0.4, 0.1), 6.0, test_pos)
+	_test_ground_ring(FireRingMaterial, 6.0, test_pos)
 
 	# Test heal effect
 	print("[Player] Testing heal effect...")
@@ -140,12 +143,8 @@ func _test_lightning_visual(pos: Vector3) -> void:
 	cylinder.height = 30.0
 	bolt.mesh = cylinder
 
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(1.0, 1.0, 0.7, 0.9)
-	material.emission_enabled = true
-	material.emission = Color(1.0, 1.0, 0.5)
-	material.emission_energy_multiplier = 5.0
-	bolt.material_override = material
+	# Use preloaded material to avoid runtime emission crash
+	bolt.material_override = LightningMaterial
 
 	var flash := OmniLight3D.new()
 	flash.light_color = Color(0.8, 0.8, 1.0)
@@ -161,7 +160,7 @@ func _test_lightning_visual(pos: Vector3) -> void:
 	print("[Player] Lightning visual test passed")
 
 
-func _test_ground_ring(color: Color, radius: float, pos: Vector3) -> void:
+func _test_ground_ring(mat: Material, radius: float, pos: Vector3) -> void:
 	var effect := MeshInstance3D.new()
 	effect.name = "TestGroundRing"
 
@@ -171,17 +170,11 @@ func _test_ground_ring(color: Color, radius: float, pos: Vector3) -> void:
 	disc.height = 0.1
 	effect.mesh = disc
 
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(color.r, color.g, color.b, 0.6)
-	material.emission_enabled = true
-	material.emission = color
-	material.emission_energy_multiplier = 3.0
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	effect.material_override = material
+	# Use preloaded material to avoid runtime emission crash
+	effect.material_override = mat
 
 	var light := OmniLight3D.new()
-	light.light_color = color
+	light.light_color = Color(0.5, 0.7, 1.0)
 	light.light_energy = 4.0
 	light.omni_range = radius * 1.5
 	effect.add_child(light)
@@ -201,13 +194,8 @@ func _test_heal_effect(pos: Vector3) -> void:
 	sphere.height = 2.0
 	effect.mesh = sphere
 
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.2, 1.0, 0.3, 0.5)
-	material.emission_enabled = true
-	material.emission = Color(0.3, 1.0, 0.4)
-	material.emission_energy_multiplier = 2.0
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	effect.material_override = material
+	# Use preloaded material to avoid runtime emission crash
+	effect.material_override = HealMaterial
 
 	add_child(effect)
 	effect.global_position = pos
@@ -527,7 +515,7 @@ func _cast_frost_nova() -> void:
 				enemy.take_damage(damage, self, hit_pos)
 
 	# Create simple ground ring effect centered on player
-	_create_ground_ring(Color(0.4, 0.8, 1.0), aoe_radius)
+	_create_ground_ring(FrostRingMaterial, Color(0.4, 0.8, 1.0), aoe_radius)
 
 
 func _cast_flame_wave() -> void:
@@ -546,7 +534,7 @@ func _cast_flame_wave() -> void:
 				enemy.take_damage(damage, self, hit_pos)
 
 	# Create simple ground ring effect centered on player
-	_create_ground_ring(Color(1.0, 0.4, 0.1), aoe_radius)
+	_create_ground_ring(FireRingMaterial, Color(1.0, 0.4, 0.1), aoe_radius)
 
 
 func _cast_lightning_bolt() -> void:
@@ -633,7 +621,7 @@ func _create_lightning_visual(strike_pos: Vector3) -> void:
 	_temp_effects.append({"node": bolt, "time_left": 0.15})
 
 
-func _create_ground_ring(color: Color, radius: float) -> void:
+func _create_ground_ring(mat: Material, light_color: Color, radius: float) -> void:
 	# Simple flat disc/ring on ground centered at player position
 	var effect := MeshInstance3D.new()
 	effect.name = "GroundRing"
@@ -645,14 +633,8 @@ func _create_ground_ring(color: Color, radius: float) -> void:
 	disc.height = 0.1  # Very thin - essentially flat
 	effect.mesh = disc
 
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(color.r, color.g, color.b, 0.6)
-	material.emission_enabled = true
-	material.emission = color
-	material.emission_energy_multiplier = 3.0
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	effect.material_override = material
+	# Use preloaded material to avoid runtime emission crash
+	effect.material_override = mat
 
 	get_tree().current_scene.add_child(effect)
 	# Position at player's feet level
@@ -660,7 +642,7 @@ func _create_ground_ring(color: Color, radius: float) -> void:
 
 	# Add glow light at ground level (not from above)
 	var light := OmniLight3D.new()
-	light.light_color = color
+	light.light_color = light_color
 	light.light_energy = 4.0
 	light.omni_range = radius * 1.5
 	light.position = Vector3.ZERO  # At effect center
@@ -679,13 +661,8 @@ func _create_heal_effect() -> void:
 	sphere.height = 2.0
 	effect.mesh = sphere
 
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.2, 1.0, 0.3, 0.5)
-	material.emission_enabled = true
-	material.emission = Color(0.3, 1.0, 0.4)
-	material.emission_energy_multiplier = 2.0
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	effect.material_override = material
+	# Use preloaded material to avoid runtime emission crash
+	effect.material_override = HealMaterial
 
 	get_tree().current_scene.add_child(effect)
 	effect.global_position = global_position + Vector3(0, 1.0, 0)
