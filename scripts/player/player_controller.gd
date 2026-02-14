@@ -550,11 +550,11 @@ func _cast_flame_wave() -> void:
 
 
 func _cast_lightning_bolt() -> void:
-	# Lightning bolt - strikes where aiming, AOE damage, always headshots
+	# Lightning bolt - always strikes ground at aimed XZ position, AOE damage
 	var damage := 35.0
-	var aoe_radius := 4.0
+	var aoe_radius := 5.0
 
-	# Raycast to find strike point
+	# Raycast to find where player is aiming
 	var space_state = get_world_3d().direct_space_state
 	var from: Vector3 = camera.global_position
 	var forward: Vector3 = -camera.global_transform.basis.z
@@ -565,14 +565,33 @@ func _cast_lightning_bolt() -> void:
 
 	var result = space_state.intersect_ray(query)
 
-	var strike_pos: Vector3
+	# Get the XZ position from where we're aiming
+	var aim_pos: Vector3
 	if result:
-		strike_pos = result.position
+		aim_pos = result.position
 	else:
-		strike_pos = to
+		aim_pos = to
+
+	# Now cast straight down from high above to find ground at that XZ
+	var sky_pos := Vector3(aim_pos.x, aim_pos.y + 50.0, aim_pos.z)
+	var ground_query = PhysicsRayQueryParameters3D.create(sky_pos, sky_pos + Vector3(0, -200, 0))
+	ground_query.collision_mask = 1  # Only terrain layer
+
+	var ground_result = space_state.intersect_ray(ground_query)
+
+	var strike_pos: Vector3
+	if ground_result:
+		strike_pos = ground_result.position
+	else:
+		# Fallback to terrain height lookup
+		var terrain = get_tree().get_first_node_in_group("terrain_world")
+		if terrain and terrain.has_method("get_terrain_height"):
+			strike_pos = Vector3(aim_pos.x, terrain.get_terrain_height(Vector2(aim_pos.x, aim_pos.z)), aim_pos.z)
+		else:
+			strike_pos = Vector3(aim_pos.x, 0, aim_pos.z)
 
 	# Damage enemies in AOE (simple distance check)
-	var enemies = get_tree().get_nodes_in_group("enemy")
+	var enemies = get_tree().get_nodes_in_group("enemies")
 	for enemy in enemies:
 		if not is_instance_valid(enemy):
 			continue
@@ -581,7 +600,7 @@ func _cast_lightning_bolt() -> void:
 			var head_pos: Vector3 = enemy.global_position + Vector3(0, 1.8, 0)
 			enemy.take_damage(damage, self, head_pos)
 
-	# Spawn visual effect
+	# Spawn visual effect at ground
 	_create_lightning_visual(strike_pos)
 
 
